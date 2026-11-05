@@ -553,8 +553,10 @@ $('b-sair').onclick = $('a-sair').onclick = async () => {
 // DEPOIS DE ENTRAR
 // ════════════════════════════════════════════════════════════
 async function depois_de_entrar () {
-  const { data: { session } } = await sb.auth.getSession()
-  if (!session) { tela('tela-entrar'); return }
+  // getSession() só lê o que está guardado no navegador — um acesso
+  // já cancelado continuaria entrando. getUser() pergunta ao servidor.
+  const { data: { user }, error: eu } = await sb.auth.getUser()
+  if (eu || !user) { await sb.auth.signOut(); tela('tela-entrar'); return }
 
   const { data: salao, error } = await sb.from('saloes').select('*').maybeSingle()
   if (error) { tela('tela-entrar'); return erro('e-erro', em_portugues(error)) }
@@ -904,7 +906,7 @@ document.addEventListener('keydown', (ev) => {
 // ── arranque ────────────────────────────────────────────────
 ;(async () => {
   const { data: { session } } = await sb.auth.getSession()
-  if (session) await depois_de_entrar()
+  if (session) await depois_de_entrar()   // ele revalida no servidor
   else tela('tela-entrar')
 })()
 
