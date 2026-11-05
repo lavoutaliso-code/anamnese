@@ -943,560 +943,8 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.56px}
 </div>
 
 <script type="module">
-// ════════════════════════════════════════════════════════════
-// O APP · entrar → base de clientes → ficha → atendimento gravado
-//
-// Tudo que aparece aqui vem do Postgres. Nenhuma tela inventa
-// número: «há 82 dias», «164 ativas», a cumbuca — tudo é consulta.
-// E nenhuma consulta precisa filtrar por salão: a RLS já corta.
-// ════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
-
-
-
-
-const sb = createClient('https://ckexzmgstwbhnuvtfvei.supabase.co', 'sb_publishable_3pSD7hS5HiB9hdjrzxE9rw_tipM0IFx')
-const $  = (id) => document.getElementById(id)
-const el = (q, r = document) => r.querySelector(q)
-
-// ── ferramentinhas ──────────────────────────────────────────
-const so_num = (s) => (s || '').replace(/\D/g, '')
-
-function mascara_tel (v) {
-  const d = so_num(v).slice(0, 11)
-  if (d.length <= 2)  return d.length ? `(${d}` : ''
-  if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`
-  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`
-  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`
-}
-function mascara_cpf (v) {
-  const d = so_num(v).slice(0, 11)
-  if (d.length <= 3)  return d
-  if (d.length <= 6)  return `${d.slice(0,3)}.${d.slice(3)}`
-  if (d.length <= 9)  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`
-  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`
-}
-const MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
-const MES_LONGO = ['janeiro','fevereiro','março','abril','maio','junho','julho',
-                   'agosto','setembro','outubro','novembro','dezembro']
-function data_curta (iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${String(d.getDate()).padStart(2,'0')} ${MES[d.getMonth()]} ${d.getFullYear()}`
-}
-function data_longa (iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${d.getDate()} de ${MES_LONGO[d.getMonth()]} de ${d.getFullYear()}`
-}
-function ha_quanto (dias) {
-  if (dias === null || dias === undefined) return 'nunca veio'
-  if (dias === 0) return 'hoje'
-  if (dias === 1) return 'ontem'
-  return `há ${dias} dias`
-}
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-
-function mostra (id)  { $(id).hidden = false }
-function esconde (id) { $(id).hidden = true }
-function erro (id, msg) {
-  const e = $(id)
-  if (!msg) { e.hidden = true; return }
-  e.textContent = msg; e.hidden = false
-}
-function bom (id, msg) {
-  const e = $(id)
-  if (!msg) { e.hidden = true; return }
-  e.textContent = msg; e.hidden = false
-}
-// traduz o que o Postgres devolve para o que a dona do salão entende
-function em_portugues (e) {
-  const m = (e?.message || String(e)).toLowerCase()
-  if (m.includes('clientes_tel_unico'))  return 'Já existe uma cliente com esse WhatsApp.'
-  if (m.includes('clientes_cpf_unico'))  return 'Já existe uma cliente com esse CPF.'
-  if (m.includes('invalid login'))       return 'E-mail ou senha não conferem.'
-  if (m.includes('email not confirmed')) return 'Falta confirmar o e-mail: olhe a sua caixa de entrada.'
-  if (m.includes('already registered') || m.includes('already been registered'))
-    return 'Esse e-mail já tem acesso. Use «entrar».'
-  if (m.includes('password should be')) return 'A senha precisa de pelo menos 8 caracteres.'
-  if (m.includes('código de liberação')) return 'Código de liberação inválido ou já usado.'
-  if (m.includes('já tem salão'))        return 'Este login já está ligado a um salão.'
-  if (m.includes('row-level security'))  return 'Sem permissão para isso.'
-  return e?.message || 'Deu alguma coisa errada. Tente de novo.'
-}
-
-// ── estado ──────────────────────────────────────────────────
-let SALAO = null          // {id, nome, plano, vence_em}
-let CLIENTES = []         // v_clientes
-let FILTRO = 'todas'
-let CLIENTE_ABERTA = null
-
-// ════════════════════════════════════════════════════════════
-// ENTRAR · CRIAR · ATIVAR
-// ════════════════════════════════════════════════════════════
-$('ir-criar').onclick = () => { esconde('bloco-login'); mostra('bloco-criar') }
-$('ir-login').onclick = () => { esconde('bloco-criar'); mostra('bloco-login') }
-
-$('b-entrar').onclick = async () => {
-  erro('e-erro'); bom('e-bom')
-  const email = $('e-mail').value.trim()
-  const senha = $('e-senha').value
-  if (!email || !senha) return erro('e-erro', 'Preencha e-mail e senha.')
-  $('b-entrar').disabled = true
-  const { error } = await sb.auth.signInWithPassword({ email, password: senha })
-  $('b-entrar').disabled = false
-  if (error) return erro('e-erro', em_portugues(error))
-  await depois_de_entrar()
-}
-
-$('b-criar').onclick = async () => {
-  erro('c-erro'); bom('c-bom')
-  const email  = $('c-mail').value.trim()
-  const senha  = $('c-senha').value
-  const salao  = $('c-salao').value.trim()
-  const codigo = $('c-codigo').value.trim().toUpperCase()
-  if (!email || !senha || !salao || !codigo)
-    return erro('c-erro', 'Preencha os quatro campos.')
-  if (senha.length < 8) return erro('c-erro', 'A senha precisa de pelo menos 8 caracteres.')
-
-  $('b-criar').disabled = true
-  const { data, error } = await sb.auth.signUp({ email, password: senha })
-  if (error) { $('b-criar').disabled = false; return erro('c-erro', em_portugues(error)) }
-
-  // o projeto pode exigir confirmação por e-mail: aí ainda não há sessão
-  if (!data.session) {
-    $('b-criar').disabled = false
-    return bom('c-bom', 'Acesso criado. Confirme o e-mail que acabou de chegar e volte para entrar — '
-      + 'o código de liberação continua valendo.')
-  }
-  const ok = await liberar_salao(salao, codigo, 'c-erro')
-  $('b-criar').disabled = false
-  if (ok) await depois_de_entrar()
-}
-
-$('b-ativar').onclick = async () => {
-  erro('a-erro')
-  const salao  = $('a-salao').value.trim()
-  const codigo = $('a-codigo').value.trim().toUpperCase()
-  if (!salao || !codigo) return erro('a-erro', 'Preencha o nome do salão e o código.')
-  $('b-ativar').disabled = true
-  const ok = await liberar_salao(salao, codigo, 'a-erro')
-  $('b-ativar').disabled = false
-  if (ok) await depois_de_entrar()
-}
-
-async function liberar_salao (nome, codigo, caixa) {
-  const { error } = await sb.rpc('criar_meu_salao',
-    { nome_salao: nome, codigo })
-  if (error) { erro(caixa, em_portugues(error)); return false }
-  return true
-}
-
-$('b-sair').onclick = $('a-sair').onclick = async () => {
-  await sb.auth.signOut()
-  location.reload()
-}
-$('b-config').onclick = () => window.abrirConfiguracao()
-
-// ════════════════════════════════════════════════════════════
-// DEPOIS DE ENTRAR
-// ════════════════════════════════════════════════════════════
-async function depois_de_entrar () {
-  // getSession() só lê o que está guardado no navegador — um acesso
-  // já cancelado continuaria entrando. getUser() pergunta ao servidor.
-  const { data: { user }, error: eu } = await sb.auth.getUser()
-  if (eu || !user) { await sb.auth.signOut(); tela('tela-entrar'); return }
-
-  const { data: salao, error } = await sb.from('saloes').select('*').maybeSingle()
-  if (error) { tela('tela-entrar'); return erro('e-erro', em_portugues(error)) }
-  if (!salao) { tela('tela-ativar'); return }     // logou, mas sem salão ainda
-
-  SALAO = salao
-
-  // ⭐ O PRIMEIRO ACESSO NÃO É A BASE DE CLIENTES: é a configuração.
-  // A anamnese não liga antes de o salão existir, os serviços estarem
-  // cadastrados e as perguntas conferidas.
-  if (!salao.config_pronta) {
-    tela(null)
-    return iniciarConfig({ sb, salao: SALAO, aoTerminar: (terminou) => {
-      if (terminou) return depois_de_entrar()
-      tela('tela-base'); abrir_dia_a_dia()
-    } })
-  }
-  abrir_dia_a_dia()
-}
-
-function abrir_dia_a_dia () {
-  const salao = SALAO
-  $('nome-salao').innerHTML = salao.logo_url
-    ? `<img src="${esc(salao.logo_url)}" alt="" class="logo-salao">`
-      + `<span>${esc(salao.nome.toUpperCase())}<small>Anamnese inteligente</small></span>`
-    : `${esc(salao.nome.toUpperCase())}<small>Anamnese inteligente</small>`
-  $('b-sair').textContent = iniciais(salao.nome)
-  $('hoje').textContent = hoje_por_extenso()
-  tela('tela-base')
-  carregar_base()
-}
-
-// reabrir a configuração depois, pelo menu
-window.abrirConfiguracao = () => {
-  tela(null)
-  iniciarConfig({ sb, salao: SALAO, aoTerminar: () => { tela('tela-base'); carregar_base() } })
-}
-
-function iniciais (nome) {
-  const p = (nome || '').trim().split(/\s+/)
-  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '··'
-}
-function hoje_por_extenso () {
-  const d = new Date()
-  const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
-  return `${dias[d.getDay()]}, ${d.getDate()} de ${MES_LONGO[d.getMonth()]}`
-}
-function tela (qual) {
-  for (const t of ['tela-entrar','tela-ativar','tela-base']) $(t).hidden = (t !== qual)
-}
-
-// ════════════════════════════════════════════════════════════
-// A BASE DE CLIENTES
-// ════════════════════════════════════════════════════════════
-async function carregar_base () {
-  const [{ data: linhas, error: e1 }, { data: painel, error: e2 }] = await Promise.all([
-    sb.from('v_clientes').select('*').order('dias_sem_vir', { ascending: false, nullsFirst: false }),
-    sb.from('v_painel_clientes').select('*').maybeSingle(),
-  ])
-  if (e1) { $('lista').innerHTML = `<div class="vazio">${esc(em_portugues(e1))}</div>`; return }
-  CLIENTES = linhas || []
-
-  const p = painel || { total: 0, novas: 0, ativas: 0, nao_voltaram: 0 }
-  $('n-novas').textContent   = p.novas
-  $('n-ativas').textContent  = p.ativas
-  $('n-sumiram').textContent = p.nao_voltaram
-  $('conta-total').textContent = p.total === 1 ? '1 no total' : `${p.total} no total`
-  $('q-todas').textContent  = p.total
-  $('q-ativas').textContent = p.ativas
-  $('q-sumiu').textContent  = p.nao_voltaram
-  $('q-novas').textContent  = p.novas
-  desenhar_lista()
-}
-
-function filtrada () {
-  const busca = so_num($('busca').value) || $('busca').value.trim().toLowerCase()
-  let v = CLIENTES
-  // ativa = veio nos últimos 90 dias; ser «nova» não tira de ativa
-  if (FILTRO === 'ativa') v = v.filter(c => c.dias_sem_vir !== null && c.dias_sem_vir <= 90)
-  if (FILTRO === 'nova')  v = v.filter(c => c.nova_no_mes)
-  if (FILTRO === 'sumiu') v = v.filter(c => (c.dias_sem_vir ?? 0) > 90)
-  const q = $('busca').value.trim().toLowerCase()
-  if (q) {
-    const d = so_num(q)
-    v = v.filter(c =>
-      c.nome.toLowerCase().includes(q) ||
-      (d && so_num(c.telefone).includes(d)) ||
-      (d && so_num(c.cpf || '').includes(d)))
-  }
-  return v
-}
-
-const SVG_ZAP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20z"/></svg>'
-const SVG_FRASCO = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.2L4.6 18a2 2 0 0 0 1.7 3h11.4a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M8.5 3h7"/><path d="M7.2 14h9.6"/></svg>'
-
-function desenhar_lista () {
-  const v = filtrada()
-  if (!v.length) {
-    $('lista').innerHTML = `<div class="vazio">${
-      CLIENTES.length ? 'Nenhuma cliente com esse filtro.'
-                      : 'Nenhuma cliente ainda. Toque em «Cliente nova».'}</div>`
-    $('pe-lista').textContent = ''
-    return
-  }
-  $('lista').innerHTML = v.map(c => {
-    const longe = (c.dias_sem_vir ?? 0) > 90 ? ' longe' : ''
-    const tel = so_num(c.telefone)
-    return `<div class="tr" data-id="${c.id}">
-      <span class="c-nome"><b>${esc(c.nome)}</b><span>${
-        esc(c.ultimo_procedimento || (c.visitas ? 'sem procedimento anotado' : 'ainda não atendida'))}</span></span>
-      <span class="c-zap"><a href="https://wa.me/55${tel}" target="_blank" rel="noopener"
-        ><span class="ib">${SVG_ZAP}</span><span class="num">${esc(mascara_tel(c.telefone))}</span></a></span>
-      <span class="c-ult${longe}"><b>${ha_quanto(c.dias_sem_vir)}</b><span>${
-        c.ultima_em ? data_curta(c.ultima_em) : '—'}</span></span>
-      <span class="c-hist"><button class="hist" data-card="${c.id}"
-        >${SVG_FRASCO}<span>Histórico</span></button></span>
-    </div>`
-  }).join('')
-  $('pe-lista').textContent = v.length === CLIENTES.length
-    ? `${v.length} ${v.length === 1 ? 'cliente' : 'clientes'}`
-    : `${v.length} de ${CLIENTES.length}`
-}
-
-$('busca').oninput = desenhar_lista
-for (const b of document.querySelectorAll('.ft')) {
-  b.onclick = () => {
-    for (const o of document.querySelectorAll('.ft')) o.classList.remove('on')
-    b.classList.add('on'); FILTRO = b.dataset.f; desenhar_lista()
-  }
-}
-$('lista').onclick = (ev) => {
-  const alvo = ev.target.closest('[data-card]') || ev.target.closest('.tr')
-  if (!alvo || ev.target.closest('a')) return
-  abrir_card(alvo.dataset.card || alvo.dataset.id)
-}
-
-// ── cliente nova ────────────────────────────────────────────
-$('b-nova').onclick = () => {
-  erro('n-erro'); $('n-nome').value = $('n-tel').value = $('n-cpf').value = ''
-  mostra('m-nova'); $('n-nome').focus()
-}
-$('n-tel').oninput = (e) => { e.target.value = mascara_tel(e.target.value) }
-$('n-cpf').oninput = (e) => { e.target.value = mascara_cpf(e.target.value) }
-
-$('b-salvar-cliente').onclick = async () => {
-  erro('n-erro')
-  const nome = $('n-nome').value.trim()
-  const tel  = so_num($('n-tel').value)
-  const cpf  = so_num($('n-cpf').value)
-  if (nome.length < 3)  return erro('n-erro', 'Escreva o nome da cliente.')
-  if (tel.length < 10)  return erro('n-erro', 'O WhatsApp precisa de DDD + número.')
-  if (cpf && cpf.length !== 11) return erro('n-erro', 'O CPF tem 11 dígitos.')
-
-  $('b-salvar-cliente').disabled = true
-  const { data: nova, error } = await sb.from('clientes').insert({
-    salao_id: SALAO.id, nome, telefone: tel, cpf: cpf || null }).select().single()
-  $('b-salvar-cliente').disabled = false
-  if (error) return erro('n-erro', em_portugues(error))
-  esconde('m-nova')
-  await carregar_base()
-  // ⭐ cadastrou, já começa a anamnese — é assim no salão: o cadastro
-  // é o começo do atendimento, não um fim em si.
-  abrir_anamnese(nova)
-}
-
-function abrir_anamnese (cli) {
-  esconde('m-card'); esconde('m-atend')
-  tela(null)
-  iniciarAnamnese({ sb, salao: SALAO, cliente: cli, aoTerminar: async (gravou, id) => {
-    tela('tela-base')
-    await carregar_base()
-    if (gravou && id) abrir_card(id)
-  } })
-}
-
-// ════════════════════════════════════════════════════════════
-// O CARD DO HISTÓRICO · A · a cumbuca
-// ════════════════════════════════════════════════════════════
-const CORES = ['#C79BFF','#5BE8FF','#FFC24D','#9BE88F','#FF9BB8','#8FB4FF']
-const SVG_FIO = `<svg width="44" height="66" viewBox="0 0 44 66"><ellipse cx="22.0" cy="5.5" rx="18.0" ry="4.5" fill="#5A3A22" opacity=".28"/><path d="M11 6 Q17 19.5 11 33.0 Q5 46.5 11 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M22 6 Q28 19.5 22 33.0 Q16 46.5 22 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M33 6 Q39 19.5 33 33.0 Q27 46.5 33 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/></svg>`
-
-async function abrir_card (cliente_id) {
-  const cli = CLIENTES.find(c => c.id === cliente_id)
-  if (!cli) return
-  CLIENTE_ABERTA = cli
-  $('card-conteudo').innerHTML = `<div class="vazio">Abrindo…</div>`
-  mostra('m-card')
-
-  const { data: ats, error } = await sb.from('v_atendimentos')
-    .select('*').eq('cliente_id', cliente_id).order('criado_em', { ascending: false })
-  if (error) {
-    $('card-conteudo').innerHTML = `<div class="vazio">${esc(em_portugues(error))}</div>`
-    return
-  }
-  desenhar_card(cli, ats || [])
-}
-
-function desenhar_card (cli, ats) {
-  const ultimo = ats[0]
-  const dano = ultimo?.dano || 0
-  const degraus = [1,2,3,4,5].map(n =>
-    `<i class="${n <= dano ? 'on' : ''}"></i>`).join('')
-
-  // A cumbuca: só o que entrou na mistura (a pré-química).
-  // Duas regras vêm do mockup aprovado e não são enfeite:
-  //  · a camada MAIOR fica embaixo — por isso a ordem decrescente;
-  //  · a altura é 2,2% por grama, ESCALA ABSOLUTA, não proporção.
-  //    É o que faz 30 g parecer menos cheio que 45 g em vez de as
-  //    duas encherem a tigela do mesmo jeito.
-  const pre = (ultimo?.produtos || [])
-    .filter(p => p.etapa === 'pre')
-    .sort((a, b) => Number(b.quantidade) - Number(a.quantidade))
-  const total = pre.reduce((s, p) => s + Number(p.quantidade), 0)
-  let camadas = '', legenda = '', base = 0
-  pre.forEach((p, i) => {
-    const alt = Math.max(0, Math.min(Number(p.quantidade) * 2.2, 96 - base))
-    camadas += `<i style="background:${CORES[i % CORES.length]};bottom:${base.toFixed(1)}%;height:${alt.toFixed(1)}%"></i>`
-    base += alt
-    legenda += `<span class="vl"><i style="background:${CORES[i % CORES.length]}"></i>`
-             + `<b>${Number(p.quantidade)} ${esc(p.unidade)}</b><span>${esc(p.nome)}</span></span>`
-  })
-
-  const feitos = ats.length
-    ? ats.map(a => `<div class="fl"><span class="c1">${esc(a.procedimento || '—')}</span>
-        <span class="c2">${a.dano ?? '–'}<small>/5</small></span>
-        <span class="c3">${data_curta(a.criado_em)}</span></div>`).join('')
-    : `<div class="fl"><span class="c1" style="font-weight:500;color:rgba(29,29,31,.45)">Nenhum ainda</span></div>`
-
-  const tel = so_num(cli.telefone)
-  $('card-conteudo').innerHTML = `
-    <button class="fechar" data-fecha="m-card"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <div class="cab">
-      <span class="fio">${SVG_FIO}</span>
-      <span class="id">
-        <h2 class="nome">${esc(cli.nome)}</h2>
-        <span class="dn"><span class="rot">dano</span><span class="deg">${degraus}</span>
-          <span class="dnn">${dano ? dano + '/5' : '–'}</span></span>
-      </span>
-    </div>
-    <div class="ultima">
-      <span><span class="r">Última vez aqui</span>
-        <span class="dt">${cli.ultima_em ? data_longa(cli.ultima_em) : 'Ainda não veio'}</span></span>
-      <span class="ha"><b>${cli.dias_sem_vir ?? '–'}</b><span>${
-        cli.dias_sem_vir === 1 ? 'dia' : 'dias'}</span></span>
-    </div>
-    ${ total ? `<div class="cuia-cx"><div class="cuia">${camadas}</div></div>
-      <div class="total-c">${+total.toFixed(1)}<small>${esc(pre[0].unidade)}</small></div>
-      <div class="total-r">na cumbuca</div>
-      <div class="volta-leg">${legenda}</div>` : '' }
-    <div class="feitos">
-      <div class="r"><span>Procedimentos já realizados aqui</span><span>${ats.length}</span></div>
-      <div class="tcab"><span class="c1">Procedimento</span>
-        <span class="c2">Dano</span><span class="c3">Data</span></div>
-      ${feitos}
-    </div>
-    <button class="comecar" id="b-novo-atend">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10.5 9l5 3-5 3z"/></svg>Iniciar novo atendimento</button>
-    <div class="pe">
-      <button class="planob">Ver plano pós-química</button>
-      <a class="ico zapb" href="https://wa.me/55${tel}" target="_blank" rel="noopener">${SVG_ZAP}</a>
-    </div>`
-  $('b-novo-atend').onclick = () => abrir_anamnese(cli)
-}
-
-// ════════════════════════════════════════════════════════════
-// O ATENDIMENTO · é aqui que passa a ficar gravado
-// ════════════════════════════════════════════════════════════
-let DANO = 3, FIO = 'liso'
-
-function linha_produto (nome = '', qt = '', un = 'g', et = 'pre') {
-  const d = document.createElement('div')
-  d.className = 'pl'
-  d.innerHTML = `
-    <input class="inp np" placeholder="Nome do produto" value="${esc(nome)}">
-    <input class="inp qt" inputmode="decimal" placeholder="10" value="${esc(qt)}">
-    <select class="inp un">
-      <option value="g"${un==='g'?' selected':''}>g</option>
-      <option value="ml"${un==='ml'?' selected':''}>ml</option>
-      <option value="pote"${un==='pote'?' selected':''}>pote</option>
-    </select>
-    <select class="inp et">
-      <option value="pre"${et==='pre'?' selected':''}>Pré</option>
-      <option value="quimica"${et==='quimica'?' selected':''}>Química</option>
-      <option value="pos"${et==='pos'?' selected':''}>Pós</option>
-    </select>
-    <button class="x" title="Tirar">×</button>`
-  el('.x', d).onclick = () => d.remove()
-  return d
-}
-
-function abrir_atendimento (cli) {
-  CLIENTE_ABERTA = cli
-  erro('at-erro')
-  $('at-quem').textContent = `${cli.nome} · ${mascara_tel(cli.telefone)}`
-  $('at-proc').value = cli.ultimo_procedimento || ''
-  DANO = 3; FIO = 'liso'
-  for (const b of $('at-dano').children) b.classList.toggle('on', b.dataset.d === '3')
-  for (const b of $('at-fio').children)  b.classList.toggle('on', b.dataset.t === 'liso')
-  $('at-prods').innerHTML = ''
-  $('at-prods').append(
-    linha_produto('Reconstrução', '', 'g', 'pre'),
-    linha_produto('Hidratação',   '', 'g', 'pre'),
-    linha_produto('Nutrição',     '', 'g', 'pre'))
-  esconde('m-card'); mostra('m-atend')
-  preencher_procedimentos()
-}
-
-async function preencher_procedimentos () {
-  const { data } = await sb.from('procedimentos').select('nome').eq('ativo', true)
-  $('lista-proc').innerHTML = (data || []).map(p => `<option value="${esc(p.nome)}">`).join('')
-}
-
-$('at-dano').onclick = (ev) => {
-  const b = ev.target.closest('[data-d]'); if (!b) return
-  DANO = Number(b.dataset.d)
-  for (const o of $('at-dano').children) o.classList.toggle('on', o === b)
-}
-$('at-fio').onclick = (ev) => {
-  const b = ev.target.closest('[data-t]'); if (!b) return
-  FIO = b.dataset.t
-  for (const o of $('at-fio').children) o.classList.toggle('on', o === b)
-}
-$('b-mais-prod').onclick = () => $('at-prods').append(linha_produto())
-
-$('b-salvar-atend').onclick = async () => {
-  erro('at-erro')
-  const proc = $('at-proc').value.trim()
-  if (!proc) return erro('at-erro', 'Escreva qual procedimento foi feito.')
-
-  const usados = []
-  for (const l of $('at-prods').children) {
-    const nome = el('.np', l).value.trim()
-    const qt   = Number(el('.qt', l).value.replace(',', '.'))
-    if (!nome) continue
-    if (!(qt > 0)) return erro('at-erro', `Falta a quantidade de «${nome}».`)
-    usados.push({ etapa: el('.et', l).value, nome, quantidade: qt, unidade: el('.un', l).value })
-  }
-
-  $('b-salvar-atend').disabled = true
-  try {
-    // 1 · o procedimento: reaproveita o que já existe, com o mesmo nome
-    let { data: p } = await sb.from('procedimentos')
-      .select('id').ilike('nome', proc).limit(1).maybeSingle()
-    if (!p) {
-      const { data: novo, error } = await sb.from('procedimentos')
-        .insert({ salao_id: SALAO.id, nome: proc }).select('id').single()
-      if (error) throw error
-      p = novo
-    }
-    // 2 · o atendimento
-    const { data: at, error: e2 } = await sb.from('atendimentos').insert({
-      salao_id: SALAO.id, cliente_id: CLIENTE_ABERTA.id, procedimento_id: p.id,
-      dano: DANO, tipo_fio: FIO,
-    }).select('id').single()
-    if (e2) throw e2
-    // 3 · o que foi usado e quanto
-    if (usados.length) {
-      const { error: e3 } = await sb.from('atendimento_produtos')
-        .insert(usados.map(u => ({ ...u, atendimento_id: at.id })))
-      if (e3) throw e3
-    }
-    esconde('m-atend')
-    await carregar_base()
-    await abrir_card(CLIENTE_ABERTA.id)
-  } catch (e) {
-    erro('at-erro', em_portugues(e))
-  } finally {
-    $('b-salvar-atend').disabled = false
-  }
-}
-
-// ── fechar os cartões ───────────────────────────────────────
-document.addEventListener('click', (ev) => {
-  const f = ev.target.closest('[data-fecha]')
-  if (f) { esconde(f.dataset.fecha); return }
-  for (const id of ['m-nova','m-card','m-atend'])
-    if (ev.target === $(id)) esconde(id)
-})
-document.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Escape') return
-  for (const id of ['m-nova','m-card','m-atend']) esconde(id)
-})
-
-// ── arranque ────────────────────────────────────────────────
-;(async () => {
-  const { data: { session } } = await sb.auth.getSession()
-  if (session) await depois_de_entrar()   // ele revalida no servidor
-  else tela('tela-entrar')
-})()
-
+const iniciarConfig = (() => {
 // ════════════════════════════════════════════════════════════
 // A CONFIGURAÇÃO — a trilha de 3 passos, aprovada em 04/11
 //
@@ -1507,6 +955,9 @@ document.addEventListener('keydown', (ev) => {
 // salão existir, os serviços estarem cadastrados e as perguntas
 // conferidas.
 // ════════════════════════════════════════════════════════════
+const $ = (id) => document.getElementById(id)
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 
 const PASSOS = [
   [1, 'O salão',      'nome e logo'],
@@ -2157,6 +1608,9 @@ async function novaPergunta () {
   desenhaPerguntas()
 }
 
+return iniciarConfig
+})()
+const iniciarAnamnese = (() => {
 // ════════════════════════════════════════════════════════════
 // A ANAMNESE — o que a cliente responde, e o que fica gravado
 //
@@ -2175,6 +1629,8 @@ async function novaPergunta () {
 // ⚠️ Servido como arquivo solto, cada módulo tem escopo próprio: sem
 // o `esc` daqui a tela da anamnese abria VAZIA («esc is not defined»).
 // No arquivo único o empacotador tira esta linha, senão colide.
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 
 let A_SB, A_SALAO, A_CLIENTE, A_FIM
 let A_PASSO = 1, A_PERGS = [], A_PROCS = []
@@ -2429,6 +1885,559 @@ async function gravarAnamnese (botao) {
     document.getElementById('an-card').append(av)
   }
 }
+
+return iniciarAnamnese
+})()
+// ════════════════════════════════════════════════════════════
+// O APP · entrar → base de clientes → ficha → atendimento gravado
+//
+// Tudo que aparece aqui vem do Postgres. Nenhuma tela inventa
+// número: «há 82 dias», «164 ativas», a cumbuca — tudo é consulta.
+// E nenhuma consulta precisa filtrar por salão: a RLS já corta.
+// ════════════════════════════════════════════════════════════
+
+
+const sb = createClient('https://ckexzmgstwbhnuvtfvei.supabase.co', 'sb_publishable_3pSD7hS5HiB9hdjrzxE9rw_tipM0IFx')
+const $  = (id) => document.getElementById(id)
+const el = (q, r = document) => r.querySelector(q)
+
+// ── ferramentinhas ──────────────────────────────────────────
+const so_num = (s) => (s || '').replace(/\D/g, '')
+
+function mascara_tel (v) {
+  const d = so_num(v).slice(0, 11)
+  if (d.length <= 2)  return d.length ? `(${d}` : ''
+  if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`
+  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`
+}
+function mascara_cpf (v) {
+  const d = so_num(v).slice(0, 11)
+  if (d.length <= 3)  return d
+  if (d.length <= 6)  return `${d.slice(0,3)}.${d.slice(3)}`
+  if (d.length <= 9)  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`
+  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`
+}
+const MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
+const MES_LONGO = ['janeiro','fevereiro','março','abril','maio','junho','julho',
+                   'agosto','setembro','outubro','novembro','dezembro']
+function data_curta (iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${String(d.getDate()).padStart(2,'0')} ${MES[d.getMonth()]} ${d.getFullYear()}`
+}
+function data_longa (iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getDate()} de ${MES_LONGO[d.getMonth()]} de ${d.getFullYear()}`
+}
+function ha_quanto (dias) {
+  if (dias === null || dias === undefined) return 'nunca veio'
+  if (dias === 0) return 'hoje'
+  if (dias === 1) return 'ontem'
+  return `há ${dias} dias`
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+
+function mostra (id)  { $(id).hidden = false }
+function esconde (id) { $(id).hidden = true }
+function erro (id, msg) {
+  const e = $(id)
+  if (!msg) { e.hidden = true; return }
+  e.textContent = msg; e.hidden = false
+}
+function bom (id, msg) {
+  const e = $(id)
+  if (!msg) { e.hidden = true; return }
+  e.textContent = msg; e.hidden = false
+}
+// traduz o que o Postgres devolve para o que a dona do salão entende
+function em_portugues (e) {
+  const m = (e?.message || String(e)).toLowerCase()
+  if (m.includes('clientes_tel_unico'))  return 'Já existe uma cliente com esse WhatsApp.'
+  if (m.includes('clientes_cpf_unico'))  return 'Já existe uma cliente com esse CPF.'
+  if (m.includes('invalid login'))       return 'E-mail ou senha não conferem.'
+  if (m.includes('email not confirmed')) return 'Falta confirmar o e-mail: olhe a sua caixa de entrada.'
+  if (m.includes('already registered') || m.includes('already been registered'))
+    return 'Esse e-mail já tem acesso. Use «entrar».'
+  if (m.includes('password should be')) return 'A senha precisa de pelo menos 8 caracteres.'
+  if (m.includes('código de liberação')) return 'Código de liberação inválido ou já usado.'
+  if (m.includes('já tem salão'))        return 'Este login já está ligado a um salão.'
+  if (m.includes('row-level security'))  return 'Sem permissão para isso.'
+  return e?.message || 'Deu alguma coisa errada. Tente de novo.'
+}
+
+// ── estado ──────────────────────────────────────────────────
+let SALAO = null          // {id, nome, plano, vence_em}
+let CLIENTES = []         // v_clientes
+let FILTRO = 'todas'
+let CLIENTE_ABERTA = null
+
+// ════════════════════════════════════════════════════════════
+// ENTRAR · CRIAR · ATIVAR
+// ════════════════════════════════════════════════════════════
+$('ir-criar').onclick = () => { esconde('bloco-login'); mostra('bloco-criar') }
+$('ir-login').onclick = () => { esconde('bloco-criar'); mostra('bloco-login') }
+
+$('b-entrar').onclick = async () => {
+  erro('e-erro'); bom('e-bom')
+  const email = $('e-mail').value.trim()
+  const senha = $('e-senha').value
+  if (!email || !senha) return erro('e-erro', 'Preencha e-mail e senha.')
+  $('b-entrar').disabled = true
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha })
+  $('b-entrar').disabled = false
+  if (error) return erro('e-erro', em_portugues(error))
+  await depois_de_entrar()
+}
+
+$('b-criar').onclick = async () => {
+  erro('c-erro'); bom('c-bom')
+  const email  = $('c-mail').value.trim()
+  const senha  = $('c-senha').value
+  const salao  = $('c-salao').value.trim()
+  const codigo = $('c-codigo').value.trim().toUpperCase()
+  if (!email || !senha || !salao || !codigo)
+    return erro('c-erro', 'Preencha os quatro campos.')
+  if (senha.length < 8) return erro('c-erro', 'A senha precisa de pelo menos 8 caracteres.')
+
+  $('b-criar').disabled = true
+  const { data, error } = await sb.auth.signUp({ email, password: senha })
+  if (error) { $('b-criar').disabled = false; return erro('c-erro', em_portugues(error)) }
+
+  // o projeto pode exigir confirmação por e-mail: aí ainda não há sessão
+  if (!data.session) {
+    $('b-criar').disabled = false
+    return bom('c-bom', 'Acesso criado. Confirme o e-mail que acabou de chegar e volte para entrar — '
+      + 'o código de liberação continua valendo.')
+  }
+  const ok = await liberar_salao(salao, codigo, 'c-erro')
+  $('b-criar').disabled = false
+  if (ok) await depois_de_entrar()
+}
+
+$('b-ativar').onclick = async () => {
+  erro('a-erro')
+  const salao  = $('a-salao').value.trim()
+  const codigo = $('a-codigo').value.trim().toUpperCase()
+  if (!salao || !codigo) return erro('a-erro', 'Preencha o nome do salão e o código.')
+  $('b-ativar').disabled = true
+  const ok = await liberar_salao(salao, codigo, 'a-erro')
+  $('b-ativar').disabled = false
+  if (ok) await depois_de_entrar()
+}
+
+async function liberar_salao (nome, codigo, caixa) {
+  const { error } = await sb.rpc('criar_meu_salao',
+    { nome_salao: nome, codigo })
+  if (error) { erro(caixa, em_portugues(error)); return false }
+  return true
+}
+
+$('b-sair').onclick = $('a-sair').onclick = async () => {
+  await sb.auth.signOut()
+  location.reload()
+}
+$('b-config').onclick = () => window.abrirConfiguracao()
+
+// ════════════════════════════════════════════════════════════
+// DEPOIS DE ENTRAR
+// ════════════════════════════════════════════════════════════
+async function depois_de_entrar () {
+  // getSession() só lê o que está guardado no navegador — um acesso
+  // já cancelado continuaria entrando. getUser() pergunta ao servidor.
+  const { data: { user }, error: eu } = await sb.auth.getUser()
+  if (eu || !user) { await sb.auth.signOut(); tela('tela-entrar'); return }
+
+  const { data: salao, error } = await sb.from('saloes').select('*').maybeSingle()
+  if (error) { tela('tela-entrar'); return erro('e-erro', em_portugues(error)) }
+  if (!salao) { tela('tela-ativar'); return }     // logou, mas sem salão ainda
+
+  SALAO = salao
+
+  // ⭐ O PRIMEIRO ACESSO NÃO É A BASE DE CLIENTES: é a configuração.
+  // A anamnese não liga antes de o salão existir, os serviços estarem
+  // cadastrados e as perguntas conferidas.
+  if (!salao.config_pronta) {
+    tela(null)
+    return iniciarConfig({ sb, salao: SALAO, aoTerminar: (terminou) => {
+      if (terminou) return depois_de_entrar()
+      tela('tela-base'); abrir_dia_a_dia()
+    } })
+  }
+  abrir_dia_a_dia()
+}
+
+function abrir_dia_a_dia () {
+  const salao = SALAO
+  $('nome-salao').innerHTML = salao.logo_url
+    ? `<img src="${esc(salao.logo_url)}" alt="" class="logo-salao">`
+      + `<span>${esc(salao.nome.toUpperCase())}<small>Anamnese inteligente</small></span>`
+    : `${esc(salao.nome.toUpperCase())}<small>Anamnese inteligente</small>`
+  $('b-sair').textContent = iniciais(salao.nome)
+  $('hoje').textContent = hoje_por_extenso()
+  tela('tela-base')
+  carregar_base()
+}
+
+// reabrir a configuração depois, pelo menu
+window.abrirConfiguracao = () => {
+  tela(null)
+  iniciarConfig({ sb, salao: SALAO, aoTerminar: () => { tela('tela-base'); carregar_base() } })
+}
+
+function iniciais (nome) {
+  const p = (nome || '').trim().split(/\s+/)
+  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '··'
+}
+function hoje_por_extenso () {
+  const d = new Date()
+  const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+  return `${dias[d.getDay()]}, ${d.getDate()} de ${MES_LONGO[d.getMonth()]}`
+}
+function tela (qual) {
+  for (const t of ['tela-entrar','tela-ativar','tela-base']) $(t).hidden = (t !== qual)
+}
+
+// ════════════════════════════════════════════════════════════
+// A BASE DE CLIENTES
+// ════════════════════════════════════════════════════════════
+async function carregar_base () {
+  const [{ data: linhas, error: e1 }, { data: painel, error: e2 }] = await Promise.all([
+    sb.from('v_clientes').select('*').order('dias_sem_vir', { ascending: false, nullsFirst: false }),
+    sb.from('v_painel_clientes').select('*').maybeSingle(),
+  ])
+  if (e1) { $('lista').innerHTML = `<div class="vazio">${esc(em_portugues(e1))}</div>`; return }
+  CLIENTES = linhas || []
+
+  const p = painel || { total: 0, novas: 0, ativas: 0, nao_voltaram: 0 }
+  $('n-novas').textContent   = p.novas
+  $('n-ativas').textContent  = p.ativas
+  $('n-sumiram').textContent = p.nao_voltaram
+  $('conta-total').textContent = p.total === 1 ? '1 no total' : `${p.total} no total`
+  $('q-todas').textContent  = p.total
+  $('q-ativas').textContent = p.ativas
+  $('q-sumiu').textContent  = p.nao_voltaram
+  $('q-novas').textContent  = p.novas
+  desenhar_lista()
+}
+
+function filtrada () {
+  const busca = so_num($('busca').value) || $('busca').value.trim().toLowerCase()
+  let v = CLIENTES
+  // ativa = veio nos últimos 90 dias; ser «nova» não tira de ativa
+  if (FILTRO === 'ativa') v = v.filter(c => c.dias_sem_vir !== null && c.dias_sem_vir <= 90)
+  if (FILTRO === 'nova')  v = v.filter(c => c.nova_no_mes)
+  if (FILTRO === 'sumiu') v = v.filter(c => (c.dias_sem_vir ?? 0) > 90)
+  const q = $('busca').value.trim().toLowerCase()
+  if (q) {
+    const d = so_num(q)
+    v = v.filter(c =>
+      c.nome.toLowerCase().includes(q) ||
+      (d && so_num(c.telefone).includes(d)) ||
+      (d && so_num(c.cpf || '').includes(d)))
+  }
+  return v
+}
+
+const SVG_ZAP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20z"/></svg>'
+const SVG_FRASCO = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.2L4.6 18a2 2 0 0 0 1.7 3h11.4a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M8.5 3h7"/><path d="M7.2 14h9.6"/></svg>'
+
+function desenhar_lista () {
+  const v = filtrada()
+  if (!v.length) {
+    $('lista').innerHTML = `<div class="vazio">${
+      CLIENTES.length ? 'Nenhuma cliente com esse filtro.'
+                      : 'Nenhuma cliente ainda. Toque em «Cliente nova».'}</div>`
+    $('pe-lista').textContent = ''
+    return
+  }
+  $('lista').innerHTML = v.map(c => {
+    const longe = (c.dias_sem_vir ?? 0) > 90 ? ' longe' : ''
+    const tel = so_num(c.telefone)
+    return `<div class="tr" data-id="${c.id}">
+      <span class="c-nome"><b>${esc(c.nome)}</b><span>${
+        esc(c.ultimo_procedimento || (c.visitas ? 'sem procedimento anotado' : 'ainda não atendida'))}</span></span>
+      <span class="c-zap"><a href="https://wa.me/55${tel}" target="_blank" rel="noopener"
+        ><span class="ib">${SVG_ZAP}</span><span class="num">${esc(mascara_tel(c.telefone))}</span></a></span>
+      <span class="c-ult${longe}"><b>${ha_quanto(c.dias_sem_vir)}</b><span>${
+        c.ultima_em ? data_curta(c.ultima_em) : '—'}</span></span>
+      <span class="c-hist"><button class="hist" data-card="${c.id}"
+        >${SVG_FRASCO}<span>Histórico</span></button></span>
+    </div>`
+  }).join('')
+  $('pe-lista').textContent = v.length === CLIENTES.length
+    ? `${v.length} ${v.length === 1 ? 'cliente' : 'clientes'}`
+    : `${v.length} de ${CLIENTES.length}`
+}
+
+$('busca').oninput = desenhar_lista
+for (const b of document.querySelectorAll('.ft')) {
+  b.onclick = () => {
+    for (const o of document.querySelectorAll('.ft')) o.classList.remove('on')
+    b.classList.add('on'); FILTRO = b.dataset.f; desenhar_lista()
+  }
+}
+$('lista').onclick = (ev) => {
+  const alvo = ev.target.closest('[data-card]') || ev.target.closest('.tr')
+  if (!alvo || ev.target.closest('a')) return
+  abrir_card(alvo.dataset.card || alvo.dataset.id)
+}
+
+// ── cliente nova ────────────────────────────────────────────
+$('b-nova').onclick = () => {
+  erro('n-erro'); $('n-nome').value = $('n-tel').value = $('n-cpf').value = ''
+  mostra('m-nova'); $('n-nome').focus()
+}
+$('n-tel').oninput = (e) => { e.target.value = mascara_tel(e.target.value) }
+$('n-cpf').oninput = (e) => { e.target.value = mascara_cpf(e.target.value) }
+
+$('b-salvar-cliente').onclick = async () => {
+  erro('n-erro')
+  const nome = $('n-nome').value.trim()
+  const tel  = so_num($('n-tel').value)
+  const cpf  = so_num($('n-cpf').value)
+  if (nome.length < 3)  return erro('n-erro', 'Escreva o nome da cliente.')
+  if (tel.length < 10)  return erro('n-erro', 'O WhatsApp precisa de DDD + número.')
+  if (cpf && cpf.length !== 11) return erro('n-erro', 'O CPF tem 11 dígitos.')
+
+  $('b-salvar-cliente').disabled = true
+  const { data: nova, error } = await sb.from('clientes').insert({
+    salao_id: SALAO.id, nome, telefone: tel, cpf: cpf || null }).select().single()
+  $('b-salvar-cliente').disabled = false
+  if (error) return erro('n-erro', em_portugues(error))
+  esconde('m-nova')
+  await carregar_base()
+  // ⭐ cadastrou, já começa a anamnese — é assim no salão: o cadastro
+  // é o começo do atendimento, não um fim em si.
+  abrir_anamnese(nova)
+}
+
+function abrir_anamnese (cli) {
+  esconde('m-card'); esconde('m-atend')
+  tela(null)
+  iniciarAnamnese({ sb, salao: SALAO, cliente: cli, aoTerminar: async (gravou, id) => {
+    tela('tela-base')
+    await carregar_base()
+    if (gravou && id) abrir_card(id)
+  } })
+}
+
+// ════════════════════════════════════════════════════════════
+// O CARD DO HISTÓRICO · A · a cumbuca
+// ════════════════════════════════════════════════════════════
+const CORES = ['#C79BFF','#5BE8FF','#FFC24D','#9BE88F','#FF9BB8','#8FB4FF']
+const SVG_FIO = `<svg width="44" height="66" viewBox="0 0 44 66"><ellipse cx="22.0" cy="5.5" rx="18.0" ry="4.5" fill="#5A3A22" opacity=".28"/><path d="M11 6 Q17 19.5 11 33.0 Q5 46.5 11 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M22 6 Q28 19.5 22 33.0 Q16 46.5 22 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M33 6 Q39 19.5 33 33.0 Q27 46.5 33 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/></svg>`
+
+async function abrir_card (cliente_id) {
+  const cli = CLIENTES.find(c => c.id === cliente_id)
+  if (!cli) return
+  CLIENTE_ABERTA = cli
+  $('card-conteudo').innerHTML = `<div class="vazio">Abrindo…</div>`
+  mostra('m-card')
+
+  const { data: ats, error } = await sb.from('v_atendimentos')
+    .select('*').eq('cliente_id', cliente_id).order('criado_em', { ascending: false })
+  if (error) {
+    $('card-conteudo').innerHTML = `<div class="vazio">${esc(em_portugues(error))}</div>`
+    return
+  }
+  desenhar_card(cli, ats || [])
+}
+
+function desenhar_card (cli, ats) {
+  const ultimo = ats[0]
+  const dano = ultimo?.dano || 0
+  const degraus = [1,2,3,4,5].map(n =>
+    `<i class="${n <= dano ? 'on' : ''}"></i>`).join('')
+
+  // A cumbuca: só o que entrou na mistura (a pré-química).
+  // Duas regras vêm do mockup aprovado e não são enfeite:
+  //  · a camada MAIOR fica embaixo — por isso a ordem decrescente;
+  //  · a altura é 2,2% por grama, ESCALA ABSOLUTA, não proporção.
+  //    É o que faz 30 g parecer menos cheio que 45 g em vez de as
+  //    duas encherem a tigela do mesmo jeito.
+  const pre = (ultimo?.produtos || [])
+    .filter(p => p.etapa === 'pre')
+    .sort((a, b) => Number(b.quantidade) - Number(a.quantidade))
+  const total = pre.reduce((s, p) => s + Number(p.quantidade), 0)
+  let camadas = '', legenda = '', base = 0
+  pre.forEach((p, i) => {
+    const alt = Math.max(0, Math.min(Number(p.quantidade) * 2.2, 96 - base))
+    camadas += `<i style="background:${CORES[i % CORES.length]};bottom:${base.toFixed(1)}%;height:${alt.toFixed(1)}%"></i>`
+    base += alt
+    legenda += `<span class="vl"><i style="background:${CORES[i % CORES.length]}"></i>`
+             + `<b>${Number(p.quantidade)} ${esc(p.unidade)}</b><span>${esc(p.nome)}</span></span>`
+  })
+
+  const feitos = ats.length
+    ? ats.map(a => `<div class="fl"><span class="c1">${esc(a.procedimento || '—')}</span>
+        <span class="c2">${a.dano ?? '–'}<small>/5</small></span>
+        <span class="c3">${data_curta(a.criado_em)}</span></div>`).join('')
+    : `<div class="fl"><span class="c1" style="font-weight:500;color:rgba(29,29,31,.45)">Nenhum ainda</span></div>`
+
+  const tel = so_num(cli.telefone)
+  $('card-conteudo').innerHTML = `
+    <button class="fechar" data-fecha="m-card"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="cab">
+      <span class="fio">${SVG_FIO}</span>
+      <span class="id">
+        <h2 class="nome">${esc(cli.nome)}</h2>
+        <span class="dn"><span class="rot">dano</span><span class="deg">${degraus}</span>
+          <span class="dnn">${dano ? dano + '/5' : '–'}</span></span>
+      </span>
+    </div>
+    <div class="ultima">
+      <span><span class="r">Última vez aqui</span>
+        <span class="dt">${cli.ultima_em ? data_longa(cli.ultima_em) : 'Ainda não veio'}</span></span>
+      <span class="ha"><b>${cli.dias_sem_vir ?? '–'}</b><span>${
+        cli.dias_sem_vir === 1 ? 'dia' : 'dias'}</span></span>
+    </div>
+    ${ total ? `<div class="cuia-cx"><div class="cuia">${camadas}</div></div>
+      <div class="total-c">${+total.toFixed(1)}<small>${esc(pre[0].unidade)}</small></div>
+      <div class="total-r">na cumbuca</div>
+      <div class="volta-leg">${legenda}</div>` : '' }
+    <div class="feitos">
+      <div class="r"><span>Procedimentos já realizados aqui</span><span>${ats.length}</span></div>
+      <div class="tcab"><span class="c1">Procedimento</span>
+        <span class="c2">Dano</span><span class="c3">Data</span></div>
+      ${feitos}
+    </div>
+    <button class="comecar" id="b-novo-atend">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10.5 9l5 3-5 3z"/></svg>Iniciar novo atendimento</button>
+    <div class="pe">
+      <button class="planob">Ver plano pós-química</button>
+      <a class="ico zapb" href="https://wa.me/55${tel}" target="_blank" rel="noopener">${SVG_ZAP}</a>
+    </div>`
+  $('b-novo-atend').onclick = () => abrir_anamnese(cli)
+}
+
+// ════════════════════════════════════════════════════════════
+// O ATENDIMENTO · é aqui que passa a ficar gravado
+// ════════════════════════════════════════════════════════════
+let DANO = 3, FIO = 'liso'
+
+function linha_produto (nome = '', qt = '', un = 'g', et = 'pre') {
+  const d = document.createElement('div')
+  d.className = 'pl'
+  d.innerHTML = `
+    <input class="inp np" placeholder="Nome do produto" value="${esc(nome)}">
+    <input class="inp qt" inputmode="decimal" placeholder="10" value="${esc(qt)}">
+    <select class="inp un">
+      <option value="g"${un==='g'?' selected':''}>g</option>
+      <option value="ml"${un==='ml'?' selected':''}>ml</option>
+      <option value="pote"${un==='pote'?' selected':''}>pote</option>
+    </select>
+    <select class="inp et">
+      <option value="pre"${et==='pre'?' selected':''}>Pré</option>
+      <option value="quimica"${et==='quimica'?' selected':''}>Química</option>
+      <option value="pos"${et==='pos'?' selected':''}>Pós</option>
+    </select>
+    <button class="x" title="Tirar">×</button>`
+  el('.x', d).onclick = () => d.remove()
+  return d
+}
+
+function abrir_atendimento (cli) {
+  CLIENTE_ABERTA = cli
+  erro('at-erro')
+  $('at-quem').textContent = `${cli.nome} · ${mascara_tel(cli.telefone)}`
+  $('at-proc').value = cli.ultimo_procedimento || ''
+  DANO = 3; FIO = 'liso'
+  for (const b of $('at-dano').children) b.classList.toggle('on', b.dataset.d === '3')
+  for (const b of $('at-fio').children)  b.classList.toggle('on', b.dataset.t === 'liso')
+  $('at-prods').innerHTML = ''
+  $('at-prods').append(
+    linha_produto('Reconstrução', '', 'g', 'pre'),
+    linha_produto('Hidratação',   '', 'g', 'pre'),
+    linha_produto('Nutrição',     '', 'g', 'pre'))
+  esconde('m-card'); mostra('m-atend')
+  preencher_procedimentos()
+}
+
+async function preencher_procedimentos () {
+  const { data } = await sb.from('procedimentos').select('nome').eq('ativo', true)
+  $('lista-proc').innerHTML = (data || []).map(p => `<option value="${esc(p.nome)}">`).join('')
+}
+
+$('at-dano').onclick = (ev) => {
+  const b = ev.target.closest('[data-d]'); if (!b) return
+  DANO = Number(b.dataset.d)
+  for (const o of $('at-dano').children) o.classList.toggle('on', o === b)
+}
+$('at-fio').onclick = (ev) => {
+  const b = ev.target.closest('[data-t]'); if (!b) return
+  FIO = b.dataset.t
+  for (const o of $('at-fio').children) o.classList.toggle('on', o === b)
+}
+$('b-mais-prod').onclick = () => $('at-prods').append(linha_produto())
+
+$('b-salvar-atend').onclick = async () => {
+  erro('at-erro')
+  const proc = $('at-proc').value.trim()
+  if (!proc) return erro('at-erro', 'Escreva qual procedimento foi feito.')
+
+  const usados = []
+  for (const l of $('at-prods').children) {
+    const nome = el('.np', l).value.trim()
+    const qt   = Number(el('.qt', l).value.replace(',', '.'))
+    if (!nome) continue
+    if (!(qt > 0)) return erro('at-erro', `Falta a quantidade de «${nome}».`)
+    usados.push({ etapa: el('.et', l).value, nome, quantidade: qt, unidade: el('.un', l).value })
+  }
+
+  $('b-salvar-atend').disabled = true
+  try {
+    // 1 · o procedimento: reaproveita o que já existe, com o mesmo nome
+    let { data: p } = await sb.from('procedimentos')
+      .select('id').ilike('nome', proc).limit(1).maybeSingle()
+    if (!p) {
+      const { data: novo, error } = await sb.from('procedimentos')
+        .insert({ salao_id: SALAO.id, nome: proc }).select('id').single()
+      if (error) throw error
+      p = novo
+    }
+    // 2 · o atendimento
+    const { data: at, error: e2 } = await sb.from('atendimentos').insert({
+      salao_id: SALAO.id, cliente_id: CLIENTE_ABERTA.id, procedimento_id: p.id,
+      dano: DANO, tipo_fio: FIO,
+    }).select('id').single()
+    if (e2) throw e2
+    // 3 · o que foi usado e quanto
+    if (usados.length) {
+      const { error: e3 } = await sb.from('atendimento_produtos')
+        .insert(usados.map(u => ({ ...u, atendimento_id: at.id })))
+      if (e3) throw e3
+    }
+    esconde('m-atend')
+    await carregar_base()
+    await abrir_card(CLIENTE_ABERTA.id)
+  } catch (e) {
+    erro('at-erro', em_portugues(e))
+  } finally {
+    $('b-salvar-atend').disabled = false
+  }
+}
+
+// ── fechar os cartões ───────────────────────────────────────
+document.addEventListener('click', (ev) => {
+  const f = ev.target.closest('[data-fecha]')
+  if (f) { esconde(f.dataset.fecha); return }
+  for (const id of ['m-nova','m-card','m-atend'])
+    if (ev.target === $(id)) esconde(id)
+})
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return
+  for (const id of ['m-nova','m-card','m-atend']) esconde(id)
+})
+
+// ── arranque ────────────────────────────────────────────────
+;(async () => {
+  const { data: { session } } = await sb.auth.getSession()
+  if (session) await depois_de_entrar()   // ele revalida no servidor
+  else tela('tela-entrar')
+})()
 
 </script>
 </body></html>

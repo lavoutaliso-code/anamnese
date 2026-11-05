@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__claude-in-chrome__tabs_create_mcp",
-  "tool_input_preview": "{}",
-  "error": "This session's tab group no longer exists. Its tabs were closed or moved out of the group, and a moved tab may still be open. Call tabs_context_mcp with createIfEmpty: true to create a new group.",
-  "timestamp": "2026-11-05T13:50:20.594Z",
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /Users/lavoutaliso/Desktop/anamnese-saas && python3 empacotar.py\",\"description\":\"Rebuild with isolated module scopes\"}",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"/Users/lavoutaliso/Desktop/anamnese-saas/empacotar.py\", line 67, in <module>\n    assert not repetidas, f'declaradas duas vezes no mesmo escopo: {repetidas}'\nAssertionError: declaradas duas vezes no mesmo escopo: ['$', 'esc', 'iniciais']",
+  "timestamp": "2026-11-05T15:21:23.128Z",
   "retry_count": 1
 }
