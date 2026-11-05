@@ -1,0 +1,912 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Anamnese Inteligente</title>
+<style>
+/* ════════════════════════════════════════════════════════════
+   O CSS VEM DAS TELAS APROVADAS — rl-1 (base de clientes) e
+   ck-1 (o card A, a cumbuca). O que mudou: saiu a largura fixa
+   de 820px do mockup, porque aqui a tela é de verdade e precisa
+   servir no tablet e no celular.
+
+   ⚠️ FONTE: só a da Apple. BlinkMacSystemFont é obrigatório —
+   sem ele o Chrome ignora -apple-system e cai numa fonte qualquer.
+   ════════════════════════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#F2F6F8;
+  font-family:-apple-system,BlinkMacSystemFont,system-ui,'SF Pro Display','SF Pro Text',
+  'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1D1D1F;
+  -webkit-font-smoothing:antialiased;line-height:1.4;min-height:100vh}
+button,input,select{font:inherit}
+button{cursor:pointer}
+[hidden]{display:none !important}
+
+/* ── o topo do produto ────────────────────────────────────── */
+.cabecalho{display:flex;align-items:center;background:#fff;padding:14px 26px;
+  box-shadow:0 1px 0 rgba(29,29,31,.08);position:sticky;top:0;z-index:20}
+.marca{font-size:13px;font-weight:600;letter-spacing:2.6px;text-transform:uppercase}
+.marca small{display:block;font-size:9.5px;font-weight:400;letter-spacing:1.9px;
+  color:rgba(29,29,31,.38);margin-top:2px;text-transform:uppercase}
+.dir-cab{margin-left:auto;display:flex;align-items:center;gap:14px}
+.hoje{font-size:13px;color:rgba(29,29,31,.45)}
+.eu{width:34px;height:34px;border-radius:50%;background:#1D1D1F;color:#fff;display:grid;
+  place-items:center;font-size:12.5px;font-weight:600;letter-spacing:.3px;border:0}
+
+.miolo{max-width:980px;margin:0 auto;padding:26px 26px 60px}
+.barra{display:flex;align-items:center;gap:14px}
+h1{font-size:28px;font-weight:700;letter-spacing:-.56px}
+.conta{font-size:14px;color:rgba(29,29,31,.45);margin-left:auto}
+
+.acoes{display:flex;gap:11px;margin-top:18px}
+.cx{flex:1;position:relative;display:flex;align-items:center}
+.cx svg{position:absolute;left:16px;color:rgba(29,29,31,.32)}
+.campo{width:100%;border:0;background:#fff;border-radius:14px;font-size:16px;
+  color:#1D1D1F;padding:14px 16px 14px 46px;
+  box-shadow:0 1px 2px rgba(9,55,84,.06), inset 0 0 0 1px rgba(29,29,31,.07)}
+.campo::placeholder{color:rgba(29,29,31,.32)}
+.nova{flex:none;border:0;border-radius:14px;background:#1D1D1F;color:#fff;
+  font-size:15px;font-weight:600;padding:0 20px;display:inline-flex;align-items:center;gap:8px}
+
+/* os três números do topo */
+.nums{display:flex;gap:11px;margin-top:16px}
+.nm{flex:1;background:#fff;border-radius:16px;padding:14px 16px;
+  box-shadow:0 1px 3px rgba(9,55,84,.08), inset 0 0 0 1px rgba(29,29,31,.055)}
+.nm .n{font-size:28px;font-weight:700;letter-spacing:-.7px;line-height:1}
+.nm .r{font-size:12.5px;color:rgba(29,29,31,.48);margin-top:4px}
+.nm.ok .n{color:#1E7A3A}
+.nm.sumiu .n{color:#B4232A}
+
+/* o filtro */
+.filtros{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.filtros .ic{color:rgba(29,29,31,.38);display:flex;margin-right:2px}
+.ft{border:0;border-radius:11px;background:#fff;font-size:13.5px;font-weight:600;
+  color:rgba(29,29,31,.6);padding:8px 13px;
+  box-shadow:0 1px 2px rgba(9,55,84,.05), inset 0 0 0 1px rgba(29,29,31,.07)}
+.ft.on{background:#1D1D1F;color:#fff;box-shadow:none}
+.ft .q{opacity:.55;margin-left:5px}
+
+.folha{margin-top:16px;background:#fff;border-radius:18px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(9,55,84,.08), inset 0 0 0 1px rgba(29,29,31,.055)}
+.th{display:flex;align-items:center;gap:16px;padding:13px 22px;
+  border-bottom:1px solid rgba(29,29,31,.08)}
+.th span{font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:rgba(29,29,31,.38)}
+.c-nome{flex:1;min-width:0}
+.c-zap{width:168px;flex:none}
+.c-ult{width:150px;flex:none}
+.c-hist{width:132px;flex:none;text-align:right}
+.tr{display:flex;align-items:center;gap:16px;padding:0 22px;height:76px;position:relative}
+.tr + .tr::before{content:"";position:absolute;left:22px;right:22px;top:0;height:1px;
+  background:rgba(29,29,31,.07)}
+.tr .c-nome b{font-size:16.5px;font-weight:600;display:block;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.tr .c-nome span{display:block;font-size:12.5px;color:rgba(29,29,31,.42);margin-top:1px}
+/* o WhatsApp é link de verdade: toca e cai na conversa */
+.tr .c-zap a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+  font-size:14.5px;font-weight:600;color:#1FA855;font-variant-numeric:tabular-nums}
+.tr .c-zap .ib{width:28px;height:28px;border-radius:50%;background:rgba(31,168,85,.12);
+  display:grid;place-items:center;flex:none}
+.tr .c-ult b{display:block;font-size:15px;font-weight:600}
+.tr .c-ult span{display:block;font-size:12.5px;color:rgba(29,29,31,.42)}
+.tr .c-ult.longe b{color:#B4232A}
+.tr .c-hist{display:flex;justify-content:flex-end}
+.hist{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;
+  font-size:14px;font-weight:600;color:#0A62C4;padding:6px 0}
+.pe-lista{padding:14px 0 18px;font-size:13px;color:rgba(29,29,31,.42);text-align:center}
+.vazio{padding:46px 22px;text-align:center;color:rgba(29,29,31,.45);font-size:15px}
+
+/* ── o véu e os cartões que abrem no centro ───────────────── */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(14,22,28,.42);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;padding:22px;overflow-y:auto}
+.card{background:#fff;border-radius:26px;box-shadow:0 40px 90px rgba(10,22,30,.30);
+  position:relative;width:436px;max-width:100%;padding:26px 30px 24px;text-align:center;
+  margin:auto}
+.fechar{position:absolute;top:18px;right:18px;width:34px;height:34px;border-radius:50%;
+  border:0;background:rgba(120,120,128,.12);color:rgba(29,29,31,.55);display:grid;
+  place-items:center}
+.rot{font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  color:rgba(29,29,31,.36)}
+.nome{font-size:29px;font-weight:700;letter-spacing:-.7px}
+
+/* o card A · a cumbuca */
+.deg{display:inline-flex;gap:3px;width:70px}
+.deg i{flex:1;height:6px;border-radius:3px;background:#E6EAEE}
+.deg i.on{background:#C96A12}
+.cab{display:flex;align-items:center;gap:16px;text-align:left}
+.cab .fio{flex:none;opacity:.9}
+.cab .id{flex:1;min-width:0}
+.dn{display:flex;align-items:center;gap:8px;margin-top:9px}
+.dnn{font-size:12px;font-weight:700;color:rgba(29,29,31,.45)}
+.ultima{display:flex;align-items:center;gap:14px;margin-top:20px;padding:14px 16px;
+  border-radius:16px;background:#F4F7F9;text-align:left}
+.ultima .r{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(29,29,31,.38)}
+.ultima .dt{display:block;font-size:19px;font-weight:700;letter-spacing:-.4px;margin-top:2px}
+.ultima .ha{margin-left:auto;text-align:right;flex:none}
+.ultima .ha b{display:block;font-size:26px;font-weight:700;letter-spacing:-.6px;line-height:1}
+.ultima .ha span{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;
+  color:rgba(29,29,31,.4)}
+.cuia-cx{margin:26px 0 20px;display:flex;justify-content:center}
+.cuia{width:188px;height:98px;border-radius:0 0 94px 94px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 0 2.4px rgba(29,29,31,.16)}
+.cuia i{position:absolute;left:0;right:0;display:block}
+.total-c{font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:-4px}
+.total-c small{font-size:15px;font-weight:500;color:rgba(29,29,31,.4);margin-left:3px}
+.total-r{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(29,29,31,.36);margin-top:2px}
+.volta-leg{display:flex;justify-content:center;gap:18px;margin-top:18px;flex-wrap:wrap}
+.vl{display:flex;flex-direction:column;align-items:center;gap:5px}
+.vl i{width:11px;height:11px;border-radius:50%}
+.vl b{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.vl span{font-size:11px;color:rgba(29,29,31,.42)}
+/* a tabelinha dos procedimentos feitos aqui — sem pontinho */
+.feitos{margin-top:18px;text-align:left}
+.feitos > .r{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.feitos > .r span{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(29,29,31,.38)}
+.tcab{display:flex;align-items:center;padding:0 2px 7px;
+  border-bottom:1px solid rgba(29,29,31,.10)}
+.tcab span{font-size:9.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:rgba(29,29,31,.34)}
+.fl{display:flex;align-items:center;padding:11px 2px;
+  border-bottom:1px solid rgba(29,29,31,.06)}
+.fl:last-of-type{border-bottom:0;padding-bottom:2px}
+.c1{flex:1;min-width:0;font-size:15.5px;font-weight:600}
+.c2{width:72px;flex:none;text-align:center;font-size:15px;font-weight:600;
+  font-variant-numeric:tabular-nums}
+.c2 small{font-size:11.5px;font-weight:500;color:rgba(29,29,31,.38)}
+.c3{width:104px;flex:none;text-align:right;font-size:13.5px;font-weight:500;
+  color:rgba(29,29,31,.52);font-variant-numeric:tabular-nums}
+.tcab .c1,.tcab .c2,.tcab .c3{font-size:9.5px;font-weight:700}
+.comecar{width:100%;border:0;border-radius:15px;height:54px;background:#1D1D1F;color:#fff;
+  font-size:16px;font-weight:600;display:inline-flex;align-items:center;
+  justify-content:center;gap:10px;margin-top:22px}
+.comecar[disabled]{opacity:.45}
+.pe{display:flex;gap:9px;margin-top:9px}
+.pe button, .pe a{border:0;border-radius:14px;height:50px;font-size:14.5px;
+  font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  white-space:nowrap;text-decoration:none}
+.pe .planob{flex:1;min-width:0;background:#F2F4F6;color:#1D1D1F;font-size:14px;padding:0 12px}
+.pe .ico{width:50px;flex:none}
+.pe .zapb{background:rgba(31,168,85,.12);color:#1FA855}
+
+/* ── formulários (entrar · cliente nova · atendimento) ────── */
+.form{text-align:left;margin-top:20px;display:flex;flex-direction:column;gap:13px}
+.lab{display:block}
+.lab > span{display:block;font-size:11px;font-weight:700;letter-spacing:.9px;
+  text-transform:uppercase;color:rgba(29,29,31,.42);margin-bottom:6px}
+.inp{width:100%;border:0;border-radius:13px;background:#F4F7F9;font-size:16px;
+  color:#1D1D1F;padding:13px 15px;box-shadow:inset 0 0 0 1px rgba(29,29,31,.09)}
+.inp:focus{outline:0;box-shadow:inset 0 0 0 2px #1D1D1F}
+.inp::placeholder{color:rgba(29,29,31,.3)}
+.dupla{display:flex;gap:11px}
+.dupla > *{flex:1;min-width:0}
+.aviso{font-size:13.5px;border-radius:12px;padding:11px 13px;text-align:left}
+.aviso.erro{background:rgba(180,35,42,.09);color:#8E1D23}
+.aviso.bom{background:rgba(30,122,58,.10);color:#1E7A3A}
+.linkinho{background:none;border:0;color:#0A62C4;font-size:14px;font-weight:600;
+  padding:10px 0;display:block;margin:4px auto 0}
+.titulo-form{font-size:23px;font-weight:700;letter-spacing:-.5px;text-align:left}
+.sub-form{font-size:14px;color:rgba(29,29,31,.5);margin-top:5px;text-align:left}
+
+/* a linha de produto do atendimento */
+.prods{display:flex;flex-direction:column;gap:9px}
+.pl{display:flex;gap:8px;align-items:center}
+.pl .inp{padding:11px 12px;font-size:15px}
+/* o nome do produto é o que precisa caber inteiro — «Reconstrução»
+   estava saindo como «Recons». Os seletores encolhem, ele não. */
+.pl .np{flex:1 1 auto;min-width:0}
+.pl .qt{width:66px;flex:none;text-align:center}
+.pl .un{width:66px;flex:none;padding-right:4px}
+.pl .et{width:94px;flex:none;padding-right:4px}
+.pl .x{width:34px;height:34px;flex:none;border:0;border-radius:50%;
+  background:rgba(120,120,128,.12);color:rgba(29,29,31,.5);display:grid;place-items:center}
+.maisp{border:0;border-radius:12px;background:#F2F4F6;color:#1D1D1F;font-size:14px;
+  font-weight:600;padding:11px 15px;display:inline-flex;align-items:center;gap:8px;
+  align-self:flex-start}
+.escolha{display:flex;gap:7px;flex-wrap:wrap}
+.op{border:0;border-radius:11px;background:#F4F7F9;font-size:14.5px;font-weight:600;
+  color:rgba(29,29,31,.6);padding:10px 15px;box-shadow:inset 0 0 0 1px rgba(29,29,31,.08)}
+.op.on{background:#1D1D1F;color:#fff;box-shadow:none}
+
+/* ── a tela de entrar ─────────────────────────────────────── */
+.entrada{min-height:100vh;display:grid;place-items:center;padding:22px}
+.entrada .card{text-align:left}
+.logo-e{font-size:14px;font-weight:600;letter-spacing:2.6px;text-transform:uppercase;
+  text-align:center}
+.logo-e small{display:block;font-size:10px;font-weight:400;letter-spacing:1.9px;
+  color:rgba(29,29,31,.38);margin-top:3px}
+
+@media (max-width:720px){
+  .c-zap{width:auto;flex:none}
+  .c-zap a span.num{display:none}
+  .c-ult{width:112px}
+  .c-hist{width:44px}
+  .hist span{display:none}
+  h1{font-size:23px}
+  .nums{flex-wrap:wrap}
+  .nm{min-width:calc(50% - 6px)}
+}
+
+</style>
+</head><body>
+
+<!-- ══ 1 · ENTRAR ════════════════════════════════════════════ -->
+<section class="entrada" id="tela-entrar" hidden>
+  <div class="card">
+    <div class="logo-e">ANAMNESE<small>Inteligente</small></div>
+
+    <div id="bloco-login">
+      <div class="form">
+        <label class="lab"><span>E-mail</span>
+          <input class="inp" id="e-mail" type="email" autocomplete="username"
+                 placeholder="voce@seusalao.com.br"></label>
+        <label class="lab"><span>Senha</span>
+          <input class="inp" id="e-senha" type="password" autocomplete="current-password"
+                 placeholder="sua senha"></label>
+        <div class="aviso erro" id="e-erro" hidden></div>
+        <div class="aviso bom" id="e-bom" hidden></div>
+        <button class="comecar" id="b-entrar" style="margin-top:4px">Entrar</button>
+      </div>
+      <button class="linkinho" id="ir-criar">Comprei agora · criar meu acesso</button>
+    </div>
+
+    <div id="bloco-criar" hidden>
+      <p class="titulo-form" style="margin-top:18px">Criar o acesso do salão</p>
+      <p class="sub-form">O código de liberação veio junto com a sua compra.</p>
+      <div class="form">
+        <label class="lab"><span>E-mail</span>
+          <input class="inp" id="c-mail" type="email" autocomplete="username"
+                 placeholder="voce@seusalao.com.br"></label>
+        <label class="lab"><span>Senha que você vai usar</span>
+          <input class="inp" id="c-senha" type="password" autocomplete="new-password"
+                 placeholder="mínimo 8 caracteres"></label>
+        <label class="lab"><span>Nome do salão</span>
+          <input class="inp" id="c-salao" placeholder="Studio Marcela"></label>
+        <label class="lab"><span>Código de liberação</span>
+          <input class="inp" id="c-codigo" placeholder="LALA-2026-XX"
+                 style="text-transform:uppercase"></label>
+        <div class="aviso erro" id="c-erro" hidden></div>
+        <div class="aviso bom" id="c-bom" hidden></div>
+        <button class="comecar" id="b-criar" style="margin-top:4px">Criar meu acesso</button>
+      </div>
+      <button class="linkinho" id="ir-login">Já tenho acesso · entrar</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 2 · ATIVAR O SALÃO (logou, mas ainda não tem salão) ═══ -->
+<section class="entrada" id="tela-ativar" hidden>
+  <div class="card">
+    <div class="logo-e">ANAMNESE<small>Inteligente</small></div>
+    <p class="titulo-form" style="margin-top:18px">Falta liberar o seu salão</p>
+    <p class="sub-form">Este login existe, mas ainda não está ligado a nenhum salão.</p>
+    <div class="form">
+      <label class="lab"><span>Nome do salão</span>
+        <input class="inp" id="a-salao" placeholder="Studio Marcela"></label>
+      <label class="lab"><span>Código de liberação</span>
+        <input class="inp" id="a-codigo" placeholder="LALA-2026-XX"
+               style="text-transform:uppercase"></label>
+      <div class="aviso erro" id="a-erro" hidden></div>
+      <button class="comecar" id="b-ativar" style="margin-top:4px">Liberar o salão</button>
+    </div>
+    <button class="linkinho" id="a-sair">Sair desta conta</button>
+  </div>
+</section>
+
+<!-- ══ 3 · BASE DE CLIENTES ═════════════════════════════════ -->
+<section id="tela-base" hidden>
+  <div class="cabecalho">
+    <span class="marca" id="nome-salao">SALÃO<small>Anamnese inteligente</small></span>
+    <span class="dir-cab">
+      <span class="hoje" id="hoje"></span>
+      <button class="eu" id="b-sair" title="Sair">··</button>
+    </span>
+  </div>
+  <div class="miolo">
+    <div class="barra">
+      <h1>Base de clientes</h1>
+      <span class="conta" id="conta-total"></span>
+    </div>
+    <div class="acoes">
+      <label class="cx"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input class="campo" id="busca" placeholder="Buscar por nome, telefone ou CPF"></label>
+      <button class="nova" id="b-nova"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Cliente nova</button>
+    </div>
+    <div class="nums">
+      <div class="nm ok"><div class="n" id="n-novas">–</div><div class="r">clientes novas este mês</div></div>
+      <div class="nm"><div class="n" id="n-ativas">–</div><div class="r">clientes ativas</div></div>
+      <div class="nm sumiu"><div class="n" id="n-sumiram">–</div><div class="r">não voltaram há 90 dias</div></div>
+    </div>
+    <div class="filtros"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></span>
+      <button class="ft on" data-f="todas">Todas<span class="q" id="q-todas"></span></button>
+      <button class="ft" data-f="ativa">Ativas<span class="q" id="q-ativas"></span></button>
+      <button class="ft" data-f="sumiu">Não voltaram<span class="q" id="q-sumiu"></span></button>
+      <button class="ft" data-f="nova">Novas<span class="q" id="q-novas"></span></button>
+    </div>
+    <div class="folha">
+      <div class="th"><span class="c-nome">Cliente</span><span class="c-zap">WhatsApp</span>
+        <span class="c-ult">Última vez</span><span class="c-hist">Químico</span></div>
+      <div id="lista"></div>
+    </div>
+    <div class="pe-lista" id="pe-lista"></div>
+  </div>
+</section>
+
+<!-- ══ 4 · CLIENTE NOVA ═════════════════════════════════════ -->
+<div class="scrim" id="m-nova" hidden>
+  <div class="card" style="text-align:left">
+    <button class="fechar" data-fecha="m-nova"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <p class="titulo-form">Cliente nova</p>
+    <p class="sub-form">É por estes três campos que você acha ela depois.</p>
+    <div class="form">
+      <label class="lab"><span>Nome completo</span>
+        <input class="inp" id="n-nome" placeholder="Katia Cristina Pimenta"></label>
+      <label class="lab"><span>WhatsApp</span>
+        <input class="inp" id="n-tel" inputmode="numeric" placeholder="(31) 99888-2140"></label>
+      <label class="lab"><span>CPF</span>
+        <input class="inp" id="n-cpf" inputmode="numeric" placeholder="000.000.000-00"></label>
+      <div class="aviso erro" id="n-erro" hidden></div>
+      <button class="comecar" id="b-salvar-cliente" style="margin-top:4px">Salvar cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 5 · O CARD DO HISTÓRICO (A · a cumbuca) ══════════════ -->
+<div class="scrim" id="m-card" hidden>
+  <div class="card" id="card-conteudo"></div>
+</div>
+
+<!-- ══ 6 · NOVO ATENDIMENTO ═════════════════════════════════ -->
+<div class="scrim" id="m-atend" hidden>
+  <div class="card" style="text-align:left;width:510px">
+    <button class="fechar" data-fecha="m-atend"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <p class="titulo-form">Novo atendimento</p>
+    <p class="sub-form" id="at-quem"></p>
+    <div class="form">
+      <label class="lab"><span>Procedimento</span>
+        <input class="inp" id="at-proc" list="lista-proc" placeholder="Progressiva">
+        <datalist id="lista-proc"></datalist></label>
+
+      <div><span class="rot" style="display:block;margin-bottom:7px">Nível de dano</span>
+        <div class="escolha" id="at-dano">
+          <button class="op" data-d="1">1</button><button class="op" data-d="2">2</button>
+          <button class="op on" data-d="3">3</button><button class="op" data-d="4">4</button>
+          <button class="op" data-d="5">5</button>
+        </div></div>
+
+      <div><span class="rot" style="display:block;margin-bottom:7px">Tipo de fio</span>
+        <div class="escolha" id="at-fio">
+          <button class="op on" data-t="liso">Liso</button>
+          <button class="op" data-t="ondulado">Ondulado</button>
+          <button class="op" data-t="cacheado">Cacheado</button>
+          <button class="op" data-t="crespo">Crespo</button>
+        </div></div>
+
+      <div><span class="rot" style="display:block;margin-bottom:7px">O que foi usado, e quanto</span>
+        <div class="prods" id="at-prods"></div>
+        <button class="maisp" id="b-mais-prod" style="margin-top:9px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Outro produto</button>
+      </div>
+
+      <div class="aviso erro" id="at-erro" hidden></div>
+      <button class="comecar" id="b-salvar-atend" style="margin-top:4px">Gravar atendimento</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ════════════════════════════════════════════════════════════
+// O APP · entrar → base de clientes → ficha → atendimento gravado
+//
+// Tudo que aparece aqui vem do Postgres. Nenhuma tela inventa
+// número: «há 82 dias», «164 ativas», a cumbuca — tudo é consulta.
+// E nenhuma consulta precisa filtrar por salão: a RLS já corta.
+// ════════════════════════════════════════════════════════════
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
+
+
+const sb = createClient('https://ckexzmgstwbhnuvtfvei.supabase.co', 'sb_publishable_3pSD7hS5HiB9hdjrzxE9rw_tipM0IFx')
+const $  = (id) => document.getElementById(id)
+const el = (q, r = document) => r.querySelector(q)
+
+// ── ferramentinhas ──────────────────────────────────────────
+const so_num = (s) => (s || '').replace(/\D/g, '')
+
+function mascara_tel (v) {
+  const d = so_num(v).slice(0, 11)
+  if (d.length <= 2)  return d.length ? `(${d}` : ''
+  if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`
+  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`
+}
+function mascara_cpf (v) {
+  const d = so_num(v).slice(0, 11)
+  if (d.length <= 3)  return d
+  if (d.length <= 6)  return `${d.slice(0,3)}.${d.slice(3)}`
+  if (d.length <= 9)  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`
+  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`
+}
+const MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
+const MES_LONGO = ['janeiro','fevereiro','março','abril','maio','junho','julho',
+                   'agosto','setembro','outubro','novembro','dezembro']
+function data_curta (iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${String(d.getDate()).padStart(2,'0')} ${MES[d.getMonth()]} ${d.getFullYear()}`
+}
+function data_longa (iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getDate()} de ${MES_LONGO[d.getMonth()]} de ${d.getFullYear()}`
+}
+function ha_quanto (dias) {
+  if (dias === null || dias === undefined) return 'nunca veio'
+  if (dias === 0) return 'hoje'
+  if (dias === 1) return 'ontem'
+  return `há ${dias} dias`
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+
+function mostra (id)  { $(id).hidden = false }
+function esconde (id) { $(id).hidden = true }
+function erro (id, msg) {
+  const e = $(id)
+  if (!msg) { e.hidden = true; return }
+  e.textContent = msg; e.hidden = false
+}
+function bom (id, msg) {
+  const e = $(id)
+  if (!msg) { e.hidden = true; return }
+  e.textContent = msg; e.hidden = false
+}
+// traduz o que o Postgres devolve para o que a dona do salão entende
+function em_portugues (e) {
+  const m = (e?.message || String(e)).toLowerCase()
+  if (m.includes('clientes_tel_unico'))  return 'Já existe uma cliente com esse WhatsApp.'
+  if (m.includes('clientes_cpf_unico'))  return 'Já existe uma cliente com esse CPF.'
+  if (m.includes('invalid login'))       return 'E-mail ou senha não conferem.'
+  if (m.includes('email not confirmed')) return 'Falta confirmar o e-mail: olhe a sua caixa de entrada.'
+  if (m.includes('already registered') || m.includes('already been registered'))
+    return 'Esse e-mail já tem acesso. Use «entrar».'
+  if (m.includes('password should be')) return 'A senha precisa de pelo menos 8 caracteres.'
+  if (m.includes('código de liberação')) return 'Código de liberação inválido ou já usado.'
+  if (m.includes('já tem salão'))        return 'Este login já está ligado a um salão.'
+  if (m.includes('row-level security'))  return 'Sem permissão para isso.'
+  return e?.message || 'Deu alguma coisa errada. Tente de novo.'
+}
+
+// ── estado ──────────────────────────────────────────────────
+let SALAO = null          // {id, nome, plano, vence_em}
+let CLIENTES = []         // v_clientes
+let FILTRO = 'todas'
+let CLIENTE_ABERTA = null
+
+// ════════════════════════════════════════════════════════════
+// ENTRAR · CRIAR · ATIVAR
+// ════════════════════════════════════════════════════════════
+$('ir-criar').onclick = () => { esconde('bloco-login'); mostra('bloco-criar') }
+$('ir-login').onclick = () => { esconde('bloco-criar'); mostra('bloco-login') }
+
+$('b-entrar').onclick = async () => {
+  erro('e-erro'); bom('e-bom')
+  const email = $('e-mail').value.trim()
+  const senha = $('e-senha').value
+  if (!email || !senha) return erro('e-erro', 'Preencha e-mail e senha.')
+  $('b-entrar').disabled = true
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha })
+  $('b-entrar').disabled = false
+  if (error) return erro('e-erro', em_portugues(error))
+  await depois_de_entrar()
+}
+
+$('b-criar').onclick = async () => {
+  erro('c-erro'); bom('c-bom')
+  const email  = $('c-mail').value.trim()
+  const senha  = $('c-senha').value
+  const salao  = $('c-salao').value.trim()
+  const codigo = $('c-codigo').value.trim().toUpperCase()
+  if (!email || !senha || !salao || !codigo)
+    return erro('c-erro', 'Preencha os quatro campos.')
+  if (senha.length < 8) return erro('c-erro', 'A senha precisa de pelo menos 8 caracteres.')
+
+  $('b-criar').disabled = true
+  const { data, error } = await sb.auth.signUp({ email, password: senha })
+  if (error) { $('b-criar').disabled = false; return erro('c-erro', em_portugues(error)) }
+
+  // o projeto pode exigir confirmação por e-mail: aí ainda não há sessão
+  if (!data.session) {
+    $('b-criar').disabled = false
+    return bom('c-bom', 'Acesso criado. Confirme o e-mail que acabou de chegar e volte para entrar — '
+      + 'o código de liberação continua valendo.')
+  }
+  const ok = await liberar_salao(salao, codigo, 'c-erro')
+  $('b-criar').disabled = false
+  if (ok) await depois_de_entrar()
+}
+
+$('b-ativar').onclick = async () => {
+  erro('a-erro')
+  const salao  = $('a-salao').value.trim()
+  const codigo = $('a-codigo').value.trim().toUpperCase()
+  if (!salao || !codigo) return erro('a-erro', 'Preencha o nome do salão e o código.')
+  $('b-ativar').disabled = true
+  const ok = await liberar_salao(salao, codigo, 'a-erro')
+  $('b-ativar').disabled = false
+  if (ok) await depois_de_entrar()
+}
+
+async function liberar_salao (nome, codigo, caixa) {
+  const { error } = await sb.rpc('criar_meu_salao',
+    { nome_salao: nome, codigo })
+  if (error) { erro(caixa, em_portugues(error)); return false }
+  return true
+}
+
+$('b-sair').onclick = $('a-sair').onclick = async () => {
+  await sb.auth.signOut()
+  location.reload()
+}
+
+// ════════════════════════════════════════════════════════════
+// DEPOIS DE ENTRAR
+// ════════════════════════════════════════════════════════════
+async function depois_de_entrar () {
+  const { data: { session } } = await sb.auth.getSession()
+  if (!session) { tela('tela-entrar'); return }
+
+  const { data: salao, error } = await sb.from('saloes').select('*').maybeSingle()
+  if (error) { tela('tela-entrar'); return erro('e-erro', em_portugues(error)) }
+  if (!salao) { tela('tela-ativar'); return }     // logou, mas sem salão ainda
+
+  SALAO = salao
+  $('nome-salao').innerHTML =
+    `${esc(salao.nome.toUpperCase())}<small>Anamnese inteligente</small>`
+  $('b-sair').textContent = iniciais(salao.nome)
+  $('hoje').textContent = hoje_por_extenso()
+  tela('tela-base')
+  await carregar_base()
+}
+
+function iniciais (nome) {
+  const p = (nome || '').trim().split(/\s+/)
+  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '··'
+}
+function hoje_por_extenso () {
+  const d = new Date()
+  const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+  return `${dias[d.getDay()]}, ${d.getDate()} de ${MES_LONGO[d.getMonth()]}`
+}
+function tela (qual) {
+  for (const t of ['tela-entrar','tela-ativar','tela-base']) $(t).hidden = (t !== qual)
+}
+
+// ════════════════════════════════════════════════════════════
+// A BASE DE CLIENTES
+// ════════════════════════════════════════════════════════════
+async function carregar_base () {
+  const [{ data: linhas, error: e1 }, { data: painel, error: e2 }] = await Promise.all([
+    sb.from('v_clientes').select('*').order('dias_sem_vir', { ascending: false, nullsFirst: false }),
+    sb.from('v_painel_clientes').select('*').maybeSingle(),
+  ])
+  if (e1) { $('lista').innerHTML = `<div class="vazio">${esc(em_portugues(e1))}</div>`; return }
+  CLIENTES = linhas || []
+
+  const p = painel || { total: 0, novas: 0, ativas: 0, nao_voltaram: 0 }
+  $('n-novas').textContent   = p.novas
+  $('n-ativas').textContent  = p.ativas
+  $('n-sumiram').textContent = p.nao_voltaram
+  $('conta-total').textContent = p.total === 1 ? '1 no total' : `${p.total} no total`
+  $('q-todas').textContent  = p.total
+  $('q-ativas').textContent = p.ativas
+  $('q-sumiu').textContent  = p.nao_voltaram
+  $('q-novas').textContent  = p.novas
+  desenhar_lista()
+}
+
+function filtrada () {
+  const busca = so_num($('busca').value) || $('busca').value.trim().toLowerCase()
+  let v = CLIENTES
+  // ativa = veio nos últimos 90 dias; ser «nova» não tira de ativa
+  if (FILTRO === 'ativa') v = v.filter(c => c.dias_sem_vir !== null && c.dias_sem_vir <= 90)
+  if (FILTRO === 'nova')  v = v.filter(c => c.nova_no_mes)
+  if (FILTRO === 'sumiu') v = v.filter(c => (c.dias_sem_vir ?? 0) > 90)
+  const q = $('busca').value.trim().toLowerCase()
+  if (q) {
+    const d = so_num(q)
+    v = v.filter(c =>
+      c.nome.toLowerCase().includes(q) ||
+      (d && so_num(c.telefone).includes(d)) ||
+      (d && so_num(c.cpf || '').includes(d)))
+  }
+  return v
+}
+
+const SVG_ZAP = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20z"/></svg>'
+const SVG_FRASCO = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v6.2L4.6 18a2 2 0 0 0 1.7 3h11.4a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M8.5 3h7"/><path d="M7.2 14h9.6"/></svg>'
+
+function desenhar_lista () {
+  const v = filtrada()
+  if (!v.length) {
+    $('lista').innerHTML = `<div class="vazio">${
+      CLIENTES.length ? 'Nenhuma cliente com esse filtro.'
+                      : 'Nenhuma cliente ainda. Toque em «Cliente nova».'}</div>`
+    $('pe-lista').textContent = ''
+    return
+  }
+  $('lista').innerHTML = v.map(c => {
+    const longe = (c.dias_sem_vir ?? 0) > 90 ? ' longe' : ''
+    const tel = so_num(c.telefone)
+    return `<div class="tr" data-id="${c.id}">
+      <span class="c-nome"><b>${esc(c.nome)}</b><span>${
+        esc(c.ultimo_procedimento || (c.visitas ? 'sem procedimento anotado' : 'ainda não atendida'))}</span></span>
+      <span class="c-zap"><a href="https://wa.me/55${tel}" target="_blank" rel="noopener"
+        ><span class="ib">${SVG_ZAP}</span><span class="num">${esc(mascara_tel(c.telefone))}</span></a></span>
+      <span class="c-ult${longe}"><b>${ha_quanto(c.dias_sem_vir)}</b><span>${
+        c.ultima_em ? data_curta(c.ultima_em) : '—'}</span></span>
+      <span class="c-hist"><button class="hist" data-card="${c.id}"
+        >${SVG_FRASCO}<span>Histórico</span></button></span>
+    </div>`
+  }).join('')
+  $('pe-lista').textContent = v.length === CLIENTES.length
+    ? `${v.length} ${v.length === 1 ? 'cliente' : 'clientes'}`
+    : `${v.length} de ${CLIENTES.length}`
+}
+
+$('busca').oninput = desenhar_lista
+for (const b of document.querySelectorAll('.ft')) {
+  b.onclick = () => {
+    for (const o of document.querySelectorAll('.ft')) o.classList.remove('on')
+    b.classList.add('on'); FILTRO = b.dataset.f; desenhar_lista()
+  }
+}
+$('lista').onclick = (ev) => {
+  const alvo = ev.target.closest('[data-card]') || ev.target.closest('.tr')
+  if (!alvo || ev.target.closest('a')) return
+  abrir_card(alvo.dataset.card || alvo.dataset.id)
+}
+
+// ── cliente nova ────────────────────────────────────────────
+$('b-nova').onclick = () => {
+  erro('n-erro'); $('n-nome').value = $('n-tel').value = $('n-cpf').value = ''
+  mostra('m-nova'); $('n-nome').focus()
+}
+$('n-tel').oninput = (e) => { e.target.value = mascara_tel(e.target.value) }
+$('n-cpf').oninput = (e) => { e.target.value = mascara_cpf(e.target.value) }
+
+$('b-salvar-cliente').onclick = async () => {
+  erro('n-erro')
+  const nome = $('n-nome').value.trim()
+  const tel  = so_num($('n-tel').value)
+  const cpf  = so_num($('n-cpf').value)
+  if (nome.length < 3)  return erro('n-erro', 'Escreva o nome da cliente.')
+  if (tel.length < 10)  return erro('n-erro', 'O WhatsApp precisa de DDD + número.')
+  if (cpf && cpf.length !== 11) return erro('n-erro', 'O CPF tem 11 dígitos.')
+
+  $('b-salvar-cliente').disabled = true
+  const { error } = await sb.from('clientes').insert({
+    salao_id: SALAO.id, nome, telefone: tel, cpf: cpf || null })
+  $('b-salvar-cliente').disabled = false
+  if (error) return erro('n-erro', em_portugues(error))
+  esconde('m-nova')
+  await carregar_base()
+}
+
+// ════════════════════════════════════════════════════════════
+// O CARD DO HISTÓRICO · A · a cumbuca
+// ════════════════════════════════════════════════════════════
+const CORES = ['#C79BFF','#5BE8FF','#FFC24D','#9BE88F','#FF9BB8','#8FB4FF']
+const SVG_FIO = `<svg width="44" height="66" viewBox="0 0 44 66"><ellipse cx="22.0" cy="5.5" rx="18.0" ry="4.5" fill="#5A3A22" opacity=".28"/><path d="M11 6 Q17 19.5 11 33.0 Q5 46.5 11 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M22 6 Q28 19.5 22 33.0 Q16 46.5 22 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M33 6 Q39 19.5 33 33.0 Q27 46.5 33 60" stroke="#5A3A22" stroke-width="3.4" fill="none" stroke-linecap="round"/></svg>`
+
+async function abrir_card (cliente_id) {
+  const cli = CLIENTES.find(c => c.id === cliente_id)
+  if (!cli) return
+  CLIENTE_ABERTA = cli
+  $('card-conteudo').innerHTML = `<div class="vazio">Abrindo…</div>`
+  mostra('m-card')
+
+  const { data: ats, error } = await sb.from('v_atendimentos')
+    .select('*').eq('cliente_id', cliente_id).order('criado_em', { ascending: false })
+  if (error) {
+    $('card-conteudo').innerHTML = `<div class="vazio">${esc(em_portugues(error))}</div>`
+    return
+  }
+  desenhar_card(cli, ats || [])
+}
+
+function desenhar_card (cli, ats) {
+  const ultimo = ats[0]
+  const dano = ultimo?.dano || 0
+  const degraus = [1,2,3,4,5].map(n =>
+    `<i class="${n <= dano ? 'on' : ''}"></i>`).join('')
+
+  // A cumbuca: só o que entrou na mistura (a pré-química).
+  // Duas regras vêm do mockup aprovado e não são enfeite:
+  //  · a camada MAIOR fica embaixo — por isso a ordem decrescente;
+  //  · a altura é 2,2% por grama, ESCALA ABSOLUTA, não proporção.
+  //    É o que faz 30 g parecer menos cheio que 45 g em vez de as
+  //    duas encherem a tigela do mesmo jeito.
+  const pre = (ultimo?.produtos || [])
+    .filter(p => p.etapa === 'pre')
+    .sort((a, b) => Number(b.quantidade) - Number(a.quantidade))
+  const total = pre.reduce((s, p) => s + Number(p.quantidade), 0)
+  let camadas = '', legenda = '', base = 0
+  pre.forEach((p, i) => {
+    const alt = Math.max(0, Math.min(Number(p.quantidade) * 2.2, 96 - base))
+    camadas += `<i style="background:${CORES[i % CORES.length]};bottom:${base.toFixed(1)}%;height:${alt.toFixed(1)}%"></i>`
+    base += alt
+    legenda += `<span class="vl"><i style="background:${CORES[i % CORES.length]}"></i>`
+             + `<b>${Number(p.quantidade)} ${esc(p.unidade)}</b><span>${esc(p.nome)}</span></span>`
+  })
+
+  const feitos = ats.length
+    ? ats.map(a => `<div class="fl"><span class="c1">${esc(a.procedimento || '—')}</span>
+        <span class="c2">${a.dano ?? '–'}<small>/5</small></span>
+        <span class="c3">${data_curta(a.criado_em)}</span></div>`).join('')
+    : `<div class="fl"><span class="c1" style="font-weight:500;color:rgba(29,29,31,.45)">Nenhum ainda</span></div>`
+
+  const tel = so_num(cli.telefone)
+  $('card-conteudo').innerHTML = `
+    <button class="fechar" data-fecha="m-card"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="cab">
+      <span class="fio">${SVG_FIO}</span>
+      <span class="id">
+        <h2 class="nome">${esc(cli.nome)}</h2>
+        <span class="dn"><span class="rot">dano</span><span class="deg">${degraus}</span>
+          <span class="dnn">${dano ? dano + '/5' : '–'}</span></span>
+      </span>
+    </div>
+    <div class="ultima">
+      <span><span class="r">Última vez aqui</span>
+        <span class="dt">${cli.ultima_em ? data_longa(cli.ultima_em) : 'Ainda não veio'}</span></span>
+      <span class="ha"><b>${cli.dias_sem_vir ?? '–'}</b><span>${
+        cli.dias_sem_vir === 1 ? 'dia' : 'dias'}</span></span>
+    </div>
+    ${ total ? `<div class="cuia-cx"><div class="cuia">${camadas}</div></div>
+      <div class="total-c">${+total.toFixed(1)}<small>${esc(pre[0].unidade)}</small></div>
+      <div class="total-r">na cumbuca</div>
+      <div class="volta-leg">${legenda}</div>` : '' }
+    <div class="feitos">
+      <div class="r"><span>Procedimentos já realizados aqui</span><span>${ats.length}</span></div>
+      <div class="tcab"><span class="c1">Procedimento</span>
+        <span class="c2">Dano</span><span class="c3">Data</span></div>
+      ${feitos}
+    </div>
+    <button class="comecar" id="b-novo-atend">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10.5 9l5 3-5 3z"/></svg>Iniciar novo atendimento</button>
+    <div class="pe">
+      <button class="planob">Ver plano pós-química</button>
+      <a class="ico zapb" href="https://wa.me/55${tel}" target="_blank" rel="noopener">${SVG_ZAP}</a>
+    </div>`
+  $('b-novo-atend').onclick = () => abrir_atendimento(cli)
+}
+
+// ════════════════════════════════════════════════════════════
+// O ATENDIMENTO · é aqui que passa a ficar gravado
+// ════════════════════════════════════════════════════════════
+let DANO = 3, FIO = 'liso'
+
+function linha_produto (nome = '', qt = '', un = 'g', et = 'pre') {
+  const d = document.createElement('div')
+  d.className = 'pl'
+  d.innerHTML = `
+    <input class="inp np" placeholder="Nome do produto" value="${esc(nome)}">
+    <input class="inp qt" inputmode="decimal" placeholder="10" value="${esc(qt)}">
+    <select class="inp un">
+      <option value="g"${un==='g'?' selected':''}>g</option>
+      <option value="ml"${un==='ml'?' selected':''}>ml</option>
+      <option value="pote"${un==='pote'?' selected':''}>pote</option>
+    </select>
+    <select class="inp et">
+      <option value="pre"${et==='pre'?' selected':''}>Pré</option>
+      <option value="quimica"${et==='quimica'?' selected':''}>Química</option>
+      <option value="pos"${et==='pos'?' selected':''}>Pós</option>
+    </select>
+    <button class="x" title="Tirar">×</button>`
+  el('.x', d).onclick = () => d.remove()
+  return d
+}
+
+function abrir_atendimento (cli) {
+  CLIENTE_ABERTA = cli
+  erro('at-erro')
+  $('at-quem').textContent = `${cli.nome} · ${mascara_tel(cli.telefone)}`
+  $('at-proc').value = cli.ultimo_procedimento || ''
+  DANO = 3; FIO = 'liso'
+  for (const b of $('at-dano').children) b.classList.toggle('on', b.dataset.d === '3')
+  for (const b of $('at-fio').children)  b.classList.toggle('on', b.dataset.t === 'liso')
+  $('at-prods').innerHTML = ''
+  $('at-prods').append(
+    linha_produto('Reconstrução', '', 'g', 'pre'),
+    linha_produto('Hidratação',   '', 'g', 'pre'),
+    linha_produto('Nutrição',     '', 'g', 'pre'))
+  esconde('m-card'); mostra('m-atend')
+  preencher_procedimentos()
+}
+
+async function preencher_procedimentos () {
+  const { data } = await sb.from('procedimentos').select('nome').eq('ativo', true)
+  $('lista-proc').innerHTML = (data || []).map(p => `<option value="${esc(p.nome)}">`).join('')
+}
+
+$('at-dano').onclick = (ev) => {
+  const b = ev.target.closest('[data-d]'); if (!b) return
+  DANO = Number(b.dataset.d)
+  for (const o of $('at-dano').children) o.classList.toggle('on', o === b)
+}
+$('at-fio').onclick = (ev) => {
+  const b = ev.target.closest('[data-t]'); if (!b) return
+  FIO = b.dataset.t
+  for (const o of $('at-fio').children) o.classList.toggle('on', o === b)
+}
+$('b-mais-prod').onclick = () => $('at-prods').append(linha_produto())
+
+$('b-salvar-atend').onclick = async () => {
+  erro('at-erro')
+  const proc = $('at-proc').value.trim()
+  if (!proc) return erro('at-erro', 'Escreva qual procedimento foi feito.')
+
+  const usados = []
+  for (const l of $('at-prods').children) {
+    const nome = el('.np', l).value.trim()
+    const qt   = Number(el('.qt', l).value.replace(',', '.'))
+    if (!nome) continue
+    if (!(qt > 0)) return erro('at-erro', `Falta a quantidade de «${nome}».`)
+    usados.push({ etapa: el('.et', l).value, nome, quantidade: qt, unidade: el('.un', l).value })
+  }
+
+  $('b-salvar-atend').disabled = true
+  try {
+    // 1 · o procedimento: reaproveita o que já existe, com o mesmo nome
+    let { data: p } = await sb.from('procedimentos')
+      .select('id').ilike('nome', proc).limit(1).maybeSingle()
+    if (!p) {
+      const { data: novo, error } = await sb.from('procedimentos')
+        .insert({ salao_id: SALAO.id, nome: proc }).select('id').single()
+      if (error) throw error
+      p = novo
+    }
+    // 2 · o atendimento
+    const { data: at, error: e2 } = await sb.from('atendimentos').insert({
+      salao_id: SALAO.id, cliente_id: CLIENTE_ABERTA.id, procedimento_id: p.id,
+      dano: DANO, tipo_fio: FIO,
+    }).select('id').single()
+    if (e2) throw e2
+    // 3 · o que foi usado e quanto
+    if (usados.length) {
+      const { error: e3 } = await sb.from('atendimento_produtos')
+        .insert(usados.map(u => ({ ...u, atendimento_id: at.id })))
+      if (e3) throw e3
+    }
+    esconde('m-atend')
+    await carregar_base()
+    await abrir_card(CLIENTE_ABERTA.id)
+  } catch (e) {
+    erro('at-erro', em_portugues(e))
+  } finally {
+    $('b-salvar-atend').disabled = false
+  }
+}
+
+// ── fechar os cartões ───────────────────────────────────────
+document.addEventListener('click', (ev) => {
+  const f = ev.target.closest('[data-fecha]')
+  if (f) { esconde(f.dataset.fecha); return }
+  for (const id of ['m-nova','m-card','m-atend'])
+    if (ev.target === $(id)) esconde(id)
+})
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return
+  for (const id of ['m-nova','m-card','m-atend']) esconde(id)
+})
+
+// ── arranque ────────────────────────────────────────────────
+;(async () => {
+  const { data: { session } } = await sb.auth.getSession()
+  if (session) await depois_de_entrar()
+  else tela('tela-entrar')
+})()
+
+</script>
+</body></html>
