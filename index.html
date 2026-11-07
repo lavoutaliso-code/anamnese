@@ -1190,6 +1190,9 @@ let PROD_PREVIA = 0
 
 async function passoServicos () {
   FICHA = null
+  // ⚠️ Voltar da ficha para a grade exige redesenhar o pé: sem isso ele
+  // ficava preso em «Salvar procedimento» e não havia como ir às perguntas.
+  pe()
   const { data } = await SB.from('procedimentos')
     .select('*, produtos(*, doses(*))').order('criado_em')
   PROCS = data || []
