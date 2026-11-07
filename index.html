@@ -290,9 +290,12 @@ h1{font-size:28px;font-weight:700;letter-spacing:-.56px}
 .no.agora .sb{color:rgba(29,29,31,.55)}
 .no.fim .b{background:transparent;box-shadow:inset 0 0 0 1.6px rgba(29,29,31,.22);
   color:rgba(29,29,31,.42)}
-.fio{flex:none;width:14px;height:2px;border-radius:2px;background:rgba(120,120,128,.20);
-  margin-top:15px}
-.fio.on{background:#1D1D1F}
+/* ⚠️ Escopado à trilha de propósito: `.fio` solto colidia com o desenho
+   do cacho no cartão da cliente (estilo.css `.cab .fio`), que herdava
+   14×2px e vazava por cima da palavra «dano». */
+.trilha .fio{flex:none;width:14px;height:2px;border-radius:2px;
+  background:rgba(120,120,128,.20);margin-top:15px}
+.trilha .fio.on{background:#1D1D1F}
 
 .cfg-pe{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;
   padding:14px 24px;background:#fff;box-shadow:0 -1px 0 rgba(29,29,31,.10);
